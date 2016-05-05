@@ -2,10 +2,10 @@ let SessionLoad = 1
 if &cp | set nocp | endif
 let s:cpo_save=&cpo
 set cpo&vim
-inoremap <C-Space> 
-imap <Nul> <C-Space>
-inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
 inoremap <expr> <Down> pumvisible() ? "\" : "\<Down>"
+inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
+imap <Nul> <C-Space>
+inoremap <C-Space> 
 imap <S-Tab> <Plug>SuperTabBackward
 inoremap <silent> <C-Tab> =UltiSnips#ListSnippets()
 map! <S-Insert> <MiddleMouse>
@@ -26,10 +26,10 @@ nnoremap  :tabclose
 nnoremap  :tab split:exec("tag ".expand("<cword>"))
 nnoremap   zz
 noremap <silent> $ g$
-nnoremap ,ct :!ctags -R .
-nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
-nnoremap ,df :call ClangFormatFile()
 nnoremap ,d :YcmShowDetailedDiagnostic
+nnoremap ,df :call ClangFormatFile()
+nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
+nnoremap ,ct :!ctags -R .
 nmap ,hp <Plug>GitGutterPreviewHunk
 nmap ,hr <Plug>GitGutterRevertHunk
 nmap ,hs <Plug>GitGutterStageHunk
@@ -65,24 +65,24 @@ noremap <silent> k gk
 nnoremap n nzz
 nnoremap zL zMzR:call ToggleFoldComments()
 nnoremap zl :call ToggleFoldComments()
-nnoremap <C-Right> :cn
-nnoremap <C-Left> :cp
-nnoremap <C-Down> :ccl
-nnoremap <C-Up> :cw
-map <S-F7> :make clean all -C ./build/
-map <F7> :make -C ./build/
-noremap <F4> :FSHere
-noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
-noremap <silent> <Plug>AirlineSelectPrevTab gT
-noremap <silent> <Plug>AirlineSelectTab9 :9tabn
-noremap <silent> <Plug>AirlineSelectTab8 :8tabn
-noremap <silent> <Plug>AirlineSelectTab7 :7tabn
-noremap <silent> <Plug>AirlineSelectTab6 :6tabn
-noremap <silent> <Plug>AirlineSelectTab5 :5tabn
-noremap <silent> <Plug>AirlineSelectTab4 :4tabn
-noremap <silent> <Plug>AirlineSelectTab3 :3tabn
-noremap <silent> <Plug>AirlineSelectTab2 :2tabn
 noremap <silent> <Plug>AirlineSelectTab1 :1tabn
+noremap <silent> <Plug>AirlineSelectTab2 :2tabn
+noremap <silent> <Plug>AirlineSelectTab3 :3tabn
+noremap <silent> <Plug>AirlineSelectTab4 :4tabn
+noremap <silent> <Plug>AirlineSelectTab5 :5tabn
+noremap <silent> <Plug>AirlineSelectTab6 :6tabn
+noremap <silent> <Plug>AirlineSelectTab7 :7tabn
+noremap <silent> <Plug>AirlineSelectTab8 :8tabn
+noremap <silent> <Plug>AirlineSelectTab9 :9tabn
+noremap <silent> <Plug>AirlineSelectPrevTab gT
+noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
+noremap <F4> :FSHere
+map <F7> :make -C ./build/
+map <S-F7> :make clean all -C ./build/
+nnoremap <C-Up> :cw
+nnoremap <C-Down> :ccl
+nnoremap <C-Left> :cp
+nnoremap <C-Right> :cn
 vnoremap <silent> <Plug>NetrwBrowseXVis :call netrw#BrowseXVis()
 nnoremap <silent> <Plug>NetrwBrowseX :call netrw#BrowseX(expand((exists("g:netrw_gx")? g:netrw_gx : '<cfile>')),netrw#CheckIfRemote())
 snoremap <silent> <Del> c
@@ -139,6 +139,8 @@ set fileencodings=ucs-bom,utf-8,default,latin1
 set guifont=Droid\ Sans\ Mono\ 10
 set guioptions=agimt
 set helplang=en
+set iminsert=0
+set imsearch=0
 set laststatus=2
 set mouse=a
 set omnifunc=youcompleteme#OmniComplete
@@ -167,11 +169,11 @@ if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
   let s:wipebuf = bufnr('%')
 endif
 set shortmess=aoO
-badd +0 Assignment1/CAssignment1.cpp
-badd +0 Assignment1/CSimpleArraysTask.cpp
-badd +0 Assignment1/VectorAdd.cl
-badd +0 Assignment1/CMatrixRotateTask.cpp
-badd +0 Assignment1/MatrixRot.cl
+badd +1 Assignment1/CAssignment1.cpp
+badd +1 Assignment1/CSimpleArraysTask.cpp
+badd +1 Assignment1/VectorAdd.cl
+badd +1 Assignment1/CMatrixRotateTask.cpp
+badd +1 Assignment1/MatrixRot.cl
 argglobal
 silent! argdel *
 edit Assignment1/CAssignment1.cpp
@@ -292,14 +294,20 @@ setlocal wrapmargin=0
 normal! zo
 35
 normal! zo
+44
+normal! zo
 49
 normal! zo
-let s:l = 51 - ((50 * winheight(0) + 32) / 65)
+54
+normal! zo
+59
+normal! zo
+let s:l = 46 - ((25 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-51
-normal! 031|
+46
+normal! 035|
 tabedit Assignment1/CSimpleArraysTask.cpp
 set splitbelow splitright
 wincmd t
@@ -662,24 +670,12 @@ setlocal wrapmargin=0
 normal! zo
 106
 normal! zo
-145
-normal! zo
-146
-normal! zo
-154
-normal! zo
-155
-normal! zo
-164
-normal! zo
-165
-normal! zo
-let s:l = 45 - ((37 * winheight(0) + 32) / 65)
+let s:l = 143 - ((31 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-45
-normal! 088|
+143
+normal! 03|
 tabedit Assignment1/MatrixRot.cl
 set splitbelow splitright
 wincmd t
@@ -798,12 +794,12 @@ setlocal wrapmargin=0
 normal! zo
 23
 normal! zo
-let s:l = 68 - ((40 * winheight(0) + 32) / 65)
+let s:l = 56 - ((55 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-68
-normal! 0
+56
+normal! 0109|
 tabnext 5
 if exists('s:wipebuf')
   silent exe 'bwipe ' . s:wipebuf

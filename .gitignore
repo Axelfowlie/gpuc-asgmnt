@@ -29,3 +29,5 @@
 
 # build folder
 *.build
+
+*.swp
