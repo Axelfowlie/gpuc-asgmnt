@@ -141,15 +141,36 @@ bool CReductionTask::ValidateResults()
 
 void CReductionTask::Reduction_InterleavedAddressing(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
-	//cl_int clErr;
-	//size_t globalWorkSize[1];
-	//size_t localWorkSize[1];
-	//unsigned int stride = ...;
+	cl_int clErr;
+  size_t globalWorkSize[1];
+	size_t localWorkSize[1] = {LocalWorkSize[0]};
+	unsigned int stride = 1; 
 
-	// TO DO: Implement reduction with interleaved addressing
+  cl_mem dPingPongArray[2] = {m_dPingArray, m_dPongArray};
+  unsigned int PingPongIdx = 0;
 
-	//for (...) {
-	//}
+  // N is the number of elements to be reduced in the current iteration
+  // Stop reducing for less than 2 elements
+  size_t N = m_N;
+	while (N >= 2) {
+
+    // The number of threads is half the number of elements in the array
+    // In the next iteration the number of elements is exaclty the number of threads for this iteration
+    N = N / 2 + N % 2;
+    globalWorkSize[0] = CLUtil::GetGlobalWorkSize(N, localWorkSize[0]);
+
+    // Set the kernel arguments, read-write buffer, the stride and the size of the array
+    // And launch the kernel
+    clErr = clSetKernelArg(m_InterleavedAddressingKernel, 0, sizeof(cl_mem), (void*)&dPingPongArray[PingPongIdx]);
+    clErr |= clSetKernelArg(m_InterleavedAddressingKernel, 1, sizeof(cl_uint), (void*)&stride);
+    clErr |= clSetKernelArg(m_InterleavedAddressingKernel, 2, sizeof(cl_uint), (void*)&m_N);
+    V_RETURN_CL(clErr, "Error setting kernel arguments.");
+		clErr = clEnqueueNDRangeKernel(CommandQueue, m_InterleavedAddressingKernel, 1, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
+    V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+
+    // The stride is doubled for the nes iteration
+    stride <<= 1;
+	}
 }
 
 void CReductionTask::Reduction_SequentialAddressing(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
