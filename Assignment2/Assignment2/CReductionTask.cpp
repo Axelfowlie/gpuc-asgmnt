@@ -146,9 +146,6 @@ void CReductionTask::Reduction_InterleavedAddressing(cl_context Context, cl_comm
 	size_t localWorkSize[1] = {LocalWorkSize[0]};
 	unsigned int stride = 1; 
 
-  cl_mem dPingPongArray[2] = {m_dPingArray, m_dPongArray};
-  unsigned int PingPongIdx = 0;
-
   // N is the number of elements to be reduced in the current iteration
   // Stop reducing for less than 2 elements
   size_t N = m_N;
@@ -161,7 +158,7 @@ void CReductionTask::Reduction_InterleavedAddressing(cl_context Context, cl_comm
 
     // Set the kernel arguments, read-write buffer, the stride and the size of the array
     // And launch the kernel
-    clErr = clSetKernelArg(m_InterleavedAddressingKernel, 0, sizeof(cl_mem), (void*)&dPingPongArray[PingPongIdx]);
+    clErr = clSetKernelArg(m_InterleavedAddressingKernel, 0, sizeof(cl_mem), (void*)&m_dPingArray);
     clErr |= clSetKernelArg(m_InterleavedAddressingKernel, 1, sizeof(cl_uint), (void*)&stride);
     clErr |= clSetKernelArg(m_InterleavedAddressingKernel, 2, sizeof(cl_uint), (void*)&m_N);
     V_RETURN_CL(clErr, "Error setting kernel arguments.");
@@ -175,34 +172,99 @@ void CReductionTask::Reduction_InterleavedAddressing(cl_context Context, cl_comm
 
 void CReductionTask::Reduction_SequentialAddressing(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
+	cl_int clErr;
+  size_t globalWorkSize[1];
+	size_t localWorkSize[1] = {LocalWorkSize[0]};
+	unsigned int stride; 
 
-	// TO DO: Implement reduction with sequential addressing
+  // N is the number of elements to be reduced in the current iteration
+  // Stop reducing for less than 2 elements
+  size_t N = m_N;
+	while (N >= 2) {
 
+    // The number of threads is half the number of elements in the array, that need to be reduced in this iteration
+    // This is exactly the same offset to the right summand.
+    stride = N / 2 + N % 2;
+    globalWorkSize[0] = CLUtil::GetGlobalWorkSize(stride, localWorkSize[0]);
+
+    // Set the kernel arguments, read-write buffer, the stride and the size of the array
+    // And launch the kernel
+    clErr = clSetKernelArg(m_SequentialAddressingKernel, 0, sizeof(cl_mem), (void*)&m_dPingArray);
+    clErr |= clSetKernelArg(m_SequentialAddressingKernel, 1, sizeof(cl_uint), (void*)&stride);
+    clErr |= clSetKernelArg(m_SequentialAddressingKernel, 2, sizeof(cl_uint), (void*)&N);
+    V_RETURN_CL(clErr, "Error setting kernel arguments.");
+		clErr = clEnqueueNDRangeKernel(CommandQueue, m_SequentialAddressingKernel, 1, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
+    V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+
+    // In this iteration stride elements have been written, so the number of to be reduces elements in the next iteration is stride.
+    N = stride;
+	}
 }
 
 void CReductionTask::Reduction_Decomp(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
+	cl_int clErr;
+  size_t globalWorkSize[1];
+	size_t localWorkSize[1] = {LocalWorkSize[0]};
+  size_t nGroups;
 
-	// TO DO: Implement reduction with kernel decomposition
+  // N is the number of elements to be reduced in the current iteration
+  // Stop reducing for less than 2 elements
+  size_t N = m_N;
+	while (N >= 2) {
 
-	// NOTE: make sure that the final result is always in the variable m_dPingArray
-	// as this is read back for the correctness check
-	// (CReductionTask::ExecuteTask)
-	//
-	// hint: for example, you can use swap(m_dPingArray, m_dPongArray) at the end of your for loop...
+    // The number of threads is half the number of elements in the array, that need to be reduced in this iteration
+    // This is exactly the same offset to the right summand.
+    globalWorkSize[0] = CLUtil::GetGlobalWorkSize(N / 2 + N % 2, localWorkSize[0]);
+    nGroups = globalWorkSize[0] / localWorkSize[0];
+
+    // Set the kernel arguments, read-write buffer, the stride and the size of the array
+    // And launch the kernel
+    clErr = clSetKernelArg(m_DecompKernel, 0, sizeof(cl_mem), (void*)&m_dPingArray);
+    clErr |= clSetKernelArg(m_DecompKernel, 1, sizeof(cl_mem), (void*)&m_dPongArray);
+    clErr |= clSetKernelArg(m_DecompKernel, 2, sizeof(cl_uint), (void*)&N);
+    clErr |= clSetKernelArg(m_DecompKernel, 3, LocalWorkSize[0] * sizeof(cl_uint), NULL);
+    V_RETURN_CL(clErr, "Error setting kernel arguments.");
+		clErr = clEnqueueNDRangeKernel(CommandQueue, m_DecompKernel, 1, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
+    V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+
+    // In this iteration stride elements have been written, so the number of to be reduces elements in the next iteration is stride.
+    N = nGroups;
+    swap(m_dPingArray, m_dPongArray);
+	}
 }
 
 void CReductionTask::Reduction_DecompUnroll(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
+	cl_int clErr;
+  size_t globalWorkSize[1];
+	size_t localWorkSize[1] = {LocalWorkSize[0]};
+  size_t nGroups;
 
-	// TO DO: Implement reduction with loop unrolling
+  // N is the number of elements to be reduced in the current iteration
+  // Stop reducing for less than 2 elements
+  size_t N = m_N;
+	while (N >= 2) {
 
-	// NOTE: make sure that the final result is always in the variable m_dPingArray
-	// as this is read back for the correctness check
-	// (CReductionTask::ExecuteTask)
-	//
-	// hint: for example, you can use swap(m_dPingArray, m_dPongArray) at the end of your for loop...
+    // The number of threads is half the number of elements in the array, that need to be reduced in this iteration
+    // This is exactly the same offset to the right summand.
+    globalWorkSize[0] = CLUtil::GetGlobalWorkSize(N / 2 + N % 2, localWorkSize[0]);
+    nGroups = globalWorkSize[0] / localWorkSize[0];
 
+    // Set the kernel arguments, read-write buffer, the stride and the size of the array
+    // And launch the kernel
+    clErr = clSetKernelArg(m_DecompKernel, 0, sizeof(cl_mem), (void*)&m_dPingArray);
+    clErr |= clSetKernelArg(m_DecompKernel, 1, sizeof(cl_mem), (void*)&m_dPongArray);
+    clErr |= clSetKernelArg(m_DecompKernel, 2, sizeof(cl_uint), (void*)&N);
+    clErr |= clSetKernelArg(m_DecompKernel, 3, LocalWorkSize[0] * sizeof(cl_uint), NULL);
+    V_RETURN_CL(clErr, "Error setting kernel arguments.");
+		clErr = clEnqueueNDRangeKernel(CommandQueue, m_DecompKernel, 1, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
+    V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+
+    // In this iteration stride elements have been written, so the number of to be reduces elements in the next iteration is stride.
+    N = nGroups;
+    swap(m_dPingArray, m_dPongArray);
+	}
 }
 
 void CReductionTask::ExecuteTask(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3], unsigned int Task)
@@ -230,7 +292,6 @@ void CReductionTask::ExecuteTask(cl_context Context, cl_command_queue CommandQue
 	//read back the results synchronously.
 	m_resultGPU[Task] = 0;
 	V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_dPingArray, CL_TRUE, 0, 1 * sizeof(cl_uint), &m_resultGPU[Task], 0, NULL, NULL), "Error reading data from device!");
-	
 }
 
 void CReductionTask::TestPerformance(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3], unsigned int Task)
