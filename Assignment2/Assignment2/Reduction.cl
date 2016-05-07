@@ -80,21 +80,21 @@ __kernel void Reduction_DecompUnroll(const __global uint* inArray, __global uint
 
   // Reduction of the localBlock
   stride >>= 1;
-  while (stride > 64) {
-    // We do NOT have to take care of elements in the localBlock that do not have a valid element copied from before.
-    // But we DO need to check that we do not address elements outside the range of the localBlock. Or maybe we don't since we wont use them anyway...
-    //if (LID < stride) 
-    localBlock[LID] += localBlock[LID + stride];
+  while (stride > 32) {
+    // We do need to check that we do not address elements outside the range of the localBlock.
+    // But we do NOT have to take care of elements in the localBlock that do not have a valid element copied from before.
+    if (LID < stride) localBlock[LID] += localBlock[LID + stride];
     stride >>= 1;
 
     barrier(CLK_LOCAL_MEM_FENCE);
   }
 
-  localBlock[LID] += localBlock[LID + 32];
-  localBlock[LID] += localBlock[LID + 16];
-  localBlock[LID] += localBlock[LID + 8];
-  localBlock[LID] += localBlock[LID + 4];
-  localBlock[LID] += localBlock[LID + 2];
+  if (LID < 32) localBlock[LID] += localBlock[LID + 32];
+  if (LID < 16) localBlock[LID] += localBlock[LID + 16];
+  if (LID < 8) localBlock[LID] += localBlock[LID + 8];
+  if (LID < 4) localBlock[LID] += localBlock[LID + 4];
+  if (LID < 2) localBlock[LID] += localBlock[LID + 2];
+  //if (LID < 1) localBlock[LID] += localBlock[LID + 1];
 
   // Let the first thread in the group write back the result of the local reduction
   if (LID == 0) outArray[Grp] = localBlock[0] + localBlock[1];

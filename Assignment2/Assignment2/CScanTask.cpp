@@ -140,77 +140,93 @@ void CScanTask::ComputeGPU(cl_context Context, cl_command_queue CommandQueue, si
 	TestPerformance(Context, CommandQueue, LocalWorkSize, 0);
 	TestPerformance(Context, CommandQueue, LocalWorkSize, 1);
 
-	cout << endl;
+        cout << endl;
 }
 
-void CScanTask::ComputeCPU()
-{
-	CTimer timer;
-	timer.Start();
+void CScanTask::ComputeCPU() {
+  CTimer timer;
+  timer.Start();
 
-	unsigned int nIterations = 1;
-	for(unsigned int j = 0; j < nIterations; j++) {
-		unsigned int sum = 0;
-		for(unsigned int i = 0; i < m_N; i++) {
-			sum += m_hArray[i];
-			m_hResultCPU[i] = sum; 
-		}
-	}
+  unsigned int nIterations = 1;
+  for (unsigned int j = 0; j < nIterations; j++) {
+    unsigned int sum = 0;
+    for (unsigned int i = 0; i < m_N; i++) {
+      sum += m_hArray[i];
+      m_hResultCPU[i] = sum;
+    }
+  }
 
-	timer.Stop();
-	double ms = timer.GetElapsedMilliseconds() / double(nIterations);
-	cout << "  average time: " << ms << " ms, throughput: " << 1.0e-6 * (double)m_N / ms << " Gelem/s" <<endl;
+  timer.Stop();
+  double ms = timer.GetElapsedMilliseconds() / double(nIterations);
+  cout << "  average time: " << ms << " ms, throughput: " << 1.0e-6 * (double)m_N / ms << " Gelem/s" << endl;
 }
 
-bool CScanTask::ValidateResults()
-{
-	bool success = true;
+bool CScanTask::ValidateResults() {
+  bool success = true;
 
-	for(int i = 0; i < 2; i++)
-		if(!m_bValidationResults[i])
-		{
-			cout<<"Validation of reduction kernel "<<g_kernelNames[i]<<" failed." << endl;
-			success = false;
-		}
+  for (int i = 0; i < 2; i++)
+    if (!m_bValidationResults[i]) {
+      cout << "Validation of reduction kernel " << g_kernelNames[i] << " failed." << endl;
+      success = false;
+    }
 
-	return success;
+  return success;
 }
 
-void CScanTask::Scan_Naive(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
-{
+void CScanTask::Scan_Naive(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3]) {
+  cl_int clErr;
+  size_t globalWorkSize[1];
+  size_t localWorkSize[1] = {LocalWorkSize[0]};
+  size_t offset = 1;
 
-	// TO DO: Implement naive version of scan
+  // The number of threads is half the number of elements in the array, that need to be reduced in this iteration
+  // This is exactly the same offset to the right summand.
 
-	// NOTE: make sure that the final result is always in the variable m_dPingArray
-	// as this is read back for the correctness check
-	// (CReductionTask::ValidateTask)
-	//
-	// hint: for example, you can use swap(m_dPingArray, m_dPongArray) at the end of your for loop...
+  // N is the number of elements to be reduced in the current iteration
+  // Stop reducing for less than 2 elements
+
+  while (offset < m_N) {
+    globalWorkSize[0] = CLUtil::GetGlobalWorkSize(m_N, localWorkSize[0]);
+
+    // Set the kernel arguments, read-write buffer, the stride and the size of the array
+    // And launch the kernel
+    clErr = clSetKernelArg(m_ScanNaiveKernel, 0, sizeof(cl_mem), (void*)&m_dPingArray);
+    clErr |= clSetKernelArg(m_ScanNaiveKernel, 1, sizeof(cl_mem), (void*)&m_dPongArray);
+    clErr |= clSetKernelArg(m_ScanNaiveKernel, 2, sizeof(cl_uint), (void*)&m_N);
+    clErr |= clSetKernelArg(m_ScanNaiveKernel, 3, sizeof(cl_uint), (void*)&offset);
+    V_RETURN_CL(clErr, "Error setting kernel arguments.");
+    clErr = clEnqueueNDRangeKernel(CommandQueue, m_ScanNaiveKernel, 1, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
+    V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+
+    // In this iteration stride elements have been written, so the number of to be reduces elements in the next iteration is stride.
+    offset <<= 1;
+    swap(m_dPingArray, m_dPongArray);
+  }
 }
 
-void CScanTask::Scan_WorkEfficient(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3])
-{
+void CScanTask::Scan_WorkEfficient(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3]) {
+  // TO DO: Implement efficient version of scan
 
-	// TO DO: Implement efficient version of scan
-
-	// Make sure that the local prefix sum works before you start experimenting with large arrays
-
+  // Make sure that the local prefix sum works before you start experimenting with large arrays
 }
 
-void CScanTask::ValidateTask(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3], unsigned int Task)
-{
-	//run selected task
-	switch (Task){
-		case 0:
-			V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_dPingArray, CL_FALSE, 0, m_N * sizeof(cl_uint), m_hArray, 0, NULL, NULL), "Error copying data from host to device!");
-			Scan_Naive(Context, CommandQueue, LocalWorkSize);
-			V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_dPingArray, CL_TRUE, 0, m_N * sizeof(cl_uint), m_hResultGPU, 0, NULL, NULL), "Error reading data from device!");
-			break;
-		case 1:
-			V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_dLevelArrays[0], CL_FALSE, 0, m_N * sizeof(cl_uint), m_hArray, 0, NULL, NULL), "Error copying data from host to device!");
-			Scan_WorkEfficient(Context, CommandQueue, LocalWorkSize);
-			V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_dLevelArrays[0], CL_TRUE, 0, m_N * sizeof(cl_uint), m_hResultGPU, 0, NULL, NULL), "Error reading data from device!");
-			break;
+void CScanTask::ValidateTask(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3], unsigned int Task) {
+  // run selected task
+  switch (Task) {
+    case 0:
+      V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_dPingArray, CL_FALSE, 0, m_N * sizeof(cl_uint), m_hArray, 0, NULL, NULL),
+                  "Error copying data from host to device!");
+      Scan_Naive(Context, CommandQueue, LocalWorkSize);
+      V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_dPingArray, CL_TRUE, 0, m_N * sizeof(cl_uint), m_hResultGPU, 0, NULL, NULL),
+                  "Error reading data from device!");
+      break;
+    case 1:
+      V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_dLevelArrays[0], CL_FALSE, 0, m_N * sizeof(cl_uint), m_hArray, 0, NULL, NULL),
+                  "Error copying data from host to device!");
+      Scan_WorkEfficient(Context, CommandQueue, LocalWorkSize);
+      V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_dLevelArrays[0], CL_TRUE, 0, m_N * sizeof(cl_uint), m_hResultGPU, 0, NULL, NULL),
+                  "Error reading data from device!");
+                        break;
 	}
 
 	// validate results
@@ -230,7 +246,8 @@ void CScanTask::TestPerformance(cl_context Context, cl_command_queue CommandQueu
 	timer.Start();
 
 	//run the kernel N times
-	unsigned int nIterations = 100;
+	unsigned int nIterations = 1;
+  cout << "ITERATIONS = " << 1 << endl;
 	for(unsigned int i = 0; i < nIterations; i++) {
 		//run selected task
 		switch (Task){
