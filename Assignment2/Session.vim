@@ -2,10 +2,10 @@ let SessionLoad = 1
 if &cp | set nocp | endif
 let s:cpo_save=&cpo
 set cpo&vim
-inoremap <C-Space> 
-imap <Nul> <C-Space>
-inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
 inoremap <expr> <Down> pumvisible() ? "\" : "\<Down>"
+inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
+imap <Nul> <C-Space>
+inoremap <C-Space> 
 imap <S-Tab> <Plug>SuperTabBackward
 inoremap <silent> <C-Tab> =UltiSnips#ListSnippets()
 map! <S-Insert> <MiddleMouse>
@@ -26,10 +26,10 @@ nnoremap  :tabclose
 nnoremap  :tab split:exec("tag ".expand("<cword>"))
 nnoremap   zz
 noremap <silent> $ g$
-nnoremap ,ct :!ctags -R .
-nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
-nnoremap ,df :call ClangFormatFile()
 nnoremap ,d :YcmShowDetailedDiagnostic
+nnoremap ,df :call ClangFormatFile()
+nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
+nnoremap ,ct :!ctags -R .
 nmap ,hp <Plug>GitGutterPreviewHunk
 nmap ,hr <Plug>GitGutterRevertHunk
 nmap ,hs <Plug>GitGutterStageHunk
@@ -65,13 +65,24 @@ noremap <silent> k gk
 nnoremap n nzz
 nnoremap zL zMzR:call ToggleFoldComments()
 nnoremap zl :call ToggleFoldComments()
-nnoremap <C-Right> :cn
-nnoremap <C-Left> :cp
-nnoremap <C-Down> :ccl
-nnoremap <C-Up> :cw
-map <S-F7> :make clean all -C ./build/
-map <F7> :make -C ./build/
+noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
+noremap <silent> <Plug>AirlineSelectPrevTab gT
+noremap <silent> <Plug>AirlineSelectTab9 :9tabn
+noremap <silent> <Plug>AirlineSelectTab8 :8tabn
+noremap <silent> <Plug>AirlineSelectTab7 :7tabn
+noremap <silent> <Plug>AirlineSelectTab6 :6tabn
+noremap <silent> <Plug>AirlineSelectTab5 :5tabn
+noremap <silent> <Plug>AirlineSelectTab4 :4tabn
+noremap <silent> <Plug>AirlineSelectTab3 :3tabn
+noremap <silent> <Plug>AirlineSelectTab2 :2tabn
+noremap <silent> <Plug>AirlineSelectTab1 :1tabn
 noremap <F4> :FSHere
+map <F7> :make -C ./build/
+map <S-F7> :make clean all -C ./build/
+nnoremap <C-Up> :cw
+nnoremap <C-Down> :ccl
+nnoremap <C-Left> :cp
+nnoremap <C-Right> :cn
 vnoremap <silent> <Plug>NetrwBrowseXVis :call netrw#BrowseXVis()
 nnoremap <silent> <Plug>NetrwBrowseX :call netrw#BrowseX(expand((exists("g:netrw_gx")? g:netrw_gx : '<cfile>')),netrw#CheckIfRemote())
 snoremap <silent> <Del> c
@@ -82,6 +93,7 @@ nnoremap <silent> <Plug>GitGutterRevertHunk :GitGutterRevertHunk
 nnoremap <silent> <Plug>GitGutterStageHunk :GitGutterStageHunk
 nnoremap <silent> <expr> <Plug>GitGutterPrevHunk &diff ? '[c' : ":\execute v:count1 . 'GitGutterPrevHunk'\"
 nnoremap <silent> <expr> <Plug>GitGutterNextHunk &diff ? ']c' : ":\execute v:count1 . 'GitGutterNextHunk'\"
+nnoremap <SNR>27_: :=v:count ? v:count : ''
 nnoremap <silent> <C-PageDown> :wincmd -
 nnoremap <silent> <C-PageUp> :wincmd +
 vnoremap <Right> <Nop>
@@ -127,6 +139,8 @@ set fileencodings=ucs-bom,utf-8,default,latin1
 set guifont=Droid\ Sans\ Mono\ 10
 set guioptions=agimt
 set helplang=en
+set hlsearch
+set iminsert=0
 set laststatus=2
 set mouse=a
 set omnifunc=youcompleteme#OmniComplete
@@ -150,17 +164,20 @@ set window=60
 let s:so_save = &so | let s:siso_save = &siso | set so=0 siso=0
 let v:this_session=expand("<sfile>:p")
 silent only
-cd ~/Documents/studium/GPU\ Praktikum/gpuc-asgmnt/Assignment2
+cd /media/hakononakani/Storage/uni/gpuc/gpuc-asgmnt/Assignment2
 if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
   let s:wipebuf = bufnr('%')
 endif
 set shortmess=aoO
-badd +0 Assignment2/CAssignment2.cpp
-badd +0 Assignment2/CReductionTask.cpp
-badd +0 Assignment2/Reduction.cl
-badd +0 Assignment2/CScanTask.cpp
-badd +0 Assignment2/Scan.cl
-badd +0 Common/CLUtil.cpp
+badd +1 Assignment2/CAssignment2.cpp
+badd +1 Assignment2/CReductionTask.cpp
+badd +1 Assignment2/Reduction.cl
+badd +75 Assignment2/CScanTask.cpp
+badd +1 Assignment2/Scan.cl
+badd +1 Common/CLUtil.cpp
+badd +1 Assignment2/CScanTask.h
+badd +1 Common/CommonDefs.h
+badd +1 Common/CLUtil.h
 argglobal
 silent! argdel *
 edit Assignment2/CAssignment2.cpp
@@ -279,14 +296,16 @@ setlocal wrap
 setlocal wrapmargin=0
 19
 normal! zo
+23
+normal! zo
 32
 normal! zo
-let s:l = 34 - ((33 * winheight(0) + 29) / 58)
+let s:l = 35 - ((34 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-34
-normal! 034|
+35
+normal! 05|
 tabedit Assignment2/CReductionTask.cpp
 set splitbelow splitright
 wincmd t
@@ -407,11 +426,15 @@ normal! zo
 normal! zo
 132
 normal! zc
-let s:l = 138 - ((112 * winheight(0) + 29) / 58)
+190
+normal! zo
+199
+normal! zo
+let s:l = 200 - ((171 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-138
+200
 normal! 0
 tabedit Assignment2/Reduction.cl
 set splitbelow splitright
@@ -527,13 +550,17 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
-3
+13
 normal! zo
-let s:l = 4 - ((3 * winheight(0) + 29) / 58)
+23
+normal! zo
+46
+normal! zo
+let s:l = 20 - ((19 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-4
+20
 normal! 0
 tabedit Assignment2/CScanTask.cpp
 set splitbelow splitright
@@ -649,58 +676,54 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
-57
+35
 normal! zo
-57
+35
 normal! zc
-107
+55
 normal! zo
-107
+77
+normal! zo
+55
 normal! zc
-132
+197
 normal! zo
-146
+203
 normal! zo
-146
+221
+normal! zo
+240
+normal! zo
+242
+normal! zo
+263
+normal! zo
+278
+normal! zo
+280
+normal! zo
+221
+normal! zo
+236
+normal! zo
+238
+normal! zo
+236
 normal! zc
-164
+259
 normal! zo
-164
+274
+normal! zo
+276
+normal! zo
+259
 normal! zc
-176
-normal! zo
-188
-normal! zo
-207
-normal! zo
-213
-normal! zo
-215
-normal! zo
-237
-normal! zo
-251
-normal! zo
-253
-normal! zo
-207
-normal! zo
-213
-normal! zo
-215
-normal! zo
-237
-normal! zo
-251
-normal! zo
-253
-normal! zo
-let s:l = 198 - ((55 * winheight(0) + 29) / 58)
+let s:l = 259 - ((60 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-198
-normal! 05|
+259
+normal! 0
 tabedit Assignment2/Scan.cl
 set splitbelow splitright
 wincmd t
@@ -817,20 +840,24 @@ setlocal wrap
 setlocal wrapmargin=0
 5
 normal! zo
-33
+34
 normal! zo
-39
+49
 normal! zo
-33
+64
 normal! zo
-39
+70
 normal! zo
-let s:l = 11 - ((10 * winheight(0) + 29) / 58)
+90
+normal! zo
+90
+normal! zo
+let s:l = 80 - ((49 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-11
-normal! 03|
+80
+normal! 056|
 tabnext 5
 if exists('s:wipebuf')
   silent exe 'bwipe ' . s:wipebuf

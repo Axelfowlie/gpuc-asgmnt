@@ -18,13 +18,13 @@ using namespace std;
 bool CAssignment2::DoCompute()
 {
 	// Task 1: parallel reduction
-	//cout<<"########################################"<<endl;
-	//cout<<"Running parallel reduction task..."<<endl<<endl;
-	//{
-	//	size_t LocalWorkSize[3] = {256, 1, 1};
-	//	CReductionTask reduction(1024 * 1024 * 16);
-	//	RunComputeTask(reduction, LocalWorkSize);
-	//}
+	cout<<"########################################"<<endl;
+	cout<<"Running parallel reduction task..."<<endl<<endl;
+	{
+		size_t LocalWorkSize[3] = {256, 1, 1};
+		CReductionTask reduction(1024 * 1024 * 16);
+		RunComputeTask(reduction, LocalWorkSize);
+	}
 
 	// Task 2: parallel prefix sum
 	cout<<"########################################"<<endl;
@@ -32,6 +32,8 @@ bool CAssignment2::DoCompute()
 	{
 		size_t LocalWorkSize[3] = {256, 1, 1};
 		CScanTask scan(1024 * 1024 * 64, LocalWorkSize[0]);
+		//size_t LocalWorkSize[3] = {256, 1, 1};
+		//CScanTask scan(512, LocalWorkSize[0]);
 		RunComputeTask(scan, LocalWorkSize);
 	}
 
