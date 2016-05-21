@@ -2,10 +2,10 @@ let SessionLoad = 1
 if &cp | set nocp | endif
 let s:cpo_save=&cpo
 set cpo&vim
-inoremap <C-Space> 
-imap <Nul> <C-Space>
-inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
 inoremap <expr> <Down> pumvisible() ? "\" : "\<Down>"
+inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
+imap <Nul> <C-Space>
+inoremap <C-Space> 
 imap <S-Tab> <Plug>SuperTabBackward
 inoremap <silent> <C-Tab> =UltiSnips#ListSnippets()
 map! <S-Insert> <MiddleMouse>
@@ -26,10 +26,10 @@ nnoremap  :tabclose
 nnoremap  :tab split:exec("tag ".expand("<cword>"))
 nnoremap   zz
 noremap <silent> $ g$
-nnoremap ,d :YcmShowDetailedDiagnostic
-nnoremap ,df :call ClangFormatFile()
-nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
 nnoremap ,ct :!ctags -R .
+nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
+nnoremap ,df :call ClangFormatFile()
+nnoremap ,d :YcmShowDetailedDiagnostic
 nmap ,hp <Plug>GitGutterPreviewHunk
 nmap ,hr <Plug>GitGutterRevertHunk
 nmap ,hs <Plug>GitGutterStageHunk
@@ -65,13 +65,13 @@ noremap <silent> k gk
 nnoremap n nzz
 nnoremap zL zMzR:call ToggleFoldComments()
 nnoremap zl :call ToggleFoldComments()
-noremap <F4> :FSHere
-map <F7> :make -C ./build/
-map <S-F7> :make clean all -C ./build/
-nnoremap <C-Up> :cw
-nnoremap <C-Down> :ccl
-nnoremap <C-Left> :cp
 nnoremap <C-Right> :cn
+nnoremap <C-Left> :cp
+nnoremap <C-Down> :ccl
+nnoremap <C-Up> :cw
+map <S-F7> :make clean all -C ./build/
+map <F7> :make -C ./build/
+noremap <F4> :FSHere
 vnoremap <silent> <Plug>NetrwBrowseXVis :call netrw#BrowseXVis()
 nnoremap <silent> <Plug>NetrwBrowseX :call netrw#BrowseX(expand((exists("g:netrw_gx")? g:netrw_gx : '<cfile>')),netrw#CheckIfRemote())
 snoremap <silent> <Del> c
@@ -129,6 +129,7 @@ set guioptions=agimt
 set helplang=en
 set laststatus=2
 set mouse=a
+set omnifunc=youcompleteme#OmniComplete
 set printoptions=paper:a4
 set ruler
 set runtimepath=~/.vim,~/.vim/bundle/vundle,~/.vim/bundle/FSwitch,~/.vim/bundle/paraMark,~/.vim/bundle/cyclespellcheck,~/.vim/bundle/ag.vim,~/.vim/bundle/ctrlp.vim,~/.vim/bundle/vim-fugitive,~/.vim/bundle/vim-gitgutter,~/.vim/bundle/supertab,~/.vim/bundle/ultisnips,~/.vim/bundle/vim-snippets,~/.vim/bundle/YouCompleteMe,~/.vim/bundle/DoxygenToolkit.vim,~/.vim/bundle/vim-airline,~/.vim/bundle/vim-latex,~/.vim/bundle/rust.vim,~/.vim/bundle/vim-cpp-enhanced-highlight,~/.vim/bundle/glsl.vim,/var/lib/vim/addons,/usr/share/vim/vimfiles,/usr/share/vim/vim74,/usr/share/vim/vimfiles/after,/var/lib/vim/addons/after,~/.vim/after,~/.vim/bundle/vundle/,~/.vim/bundle/vundle/after,~/.vim/bundle/FSwitch/after,~/.vim/bundle/paraMark/after,~/.vim/bundle/cyclespellcheck/after,~/.vim/bundle/ag.vim/after,~/.vim/bundle/ctrlp.vim/after,~/.vim/bundle/vim-fugitive/after,~/.vim/bundle/vim-gitgutter/after,~/.vim/bundle/supertab/after,~/.vim/bundle/ultisnips/after,~/.vim/bundle/vim-snippets/after,~/.vim/bundle/YouCompleteMe/after,~/.vim/bundle/DoxygenToolkit.vim/after,~/.vim/bundle/vim-airline/after,~/.vim/bundle/vim-latex/after,~/.vim/bundle/rust.vim/after,~/.vim/bundle/vim-cpp-enhanced-highlight/after,~/.vim/bundle/glsl.vim/after
@@ -157,6 +158,8 @@ set shortmess=aoO
 badd +1 Assignment3/CAssignment3.cpp
 badd +1 Assignment3/CHistogramTask.cpp
 badd +1 Assignment3/Convolution3x3.cl
+badd +0 Assignment3/CConvolutionSeparableTask.cpp
+badd +0 Assignment3/ConvolutionSeparable.cl
 argglobal
 silent! argdel *
 edit Assignment3/CAssignment3.cpp
@@ -216,7 +219,7 @@ setlocal formatexpr=
 setlocal formatoptions=croql
 setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
 setlocal grepprg=
-setlocal iminsert=2
+setlocal iminsert=0
 setlocal imsearch=2
 setlocal include=
 setlocal includeexpr=
@@ -237,7 +240,7 @@ setlocal nrformats=octal,hex
 set number
 setlocal number
 setlocal numberwidth=4
-setlocal omnifunc=ccomplete#Complete
+setlocal omnifunc=youcompleteme#OmniComplete
 setlocal path=
 setlocal nopreserveindent
 setlocal nopreviewwindow
@@ -273,12 +276,28 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
-let s:l = 1 - ((0 * winheight(0) + 29) / 58)
+21
+normal! zo
+31
+normal! zo
+33
+normal! zo
+45
+normal! zo
+50
+normal! zo
+63
+normal! zo
+74
+normal! zo
+76
+normal! zo
+let s:l = 46 - ((26 * winheight(0) + 29) / 58)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-1
-normal! 0
+46
+normal! 034|
 tabedit Assignment3/Convolution3x3.cl
 set splitbelow splitright
 wincmd t
@@ -395,13 +414,161 @@ setlocal wrap
 setlocal wrapmargin=0
 23
 normal! zo
-let s:l = 23 - ((22 * winheight(0) + 29) / 58)
+let s:l = 184 - ((25 * winheight(0) + 29) / 58)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-23
+184
 normal! 0
-tabnext 2
+tabedit Assignment3/ConvolutionSeparable.cl
+set splitbelow splitright
+wincmd t
+set winheight=1 winwidth=1
+argglobal
+setlocal keymap=
+setlocal noarabic
+setlocal autoindent
+setlocal backupcopy=
+setlocal balloonexpr=
+setlocal nobinary
+setlocal nobreakindent
+setlocal breakindentopt=
+setlocal bufhidden=
+setlocal buflisted
+setlocal buftype=
+setlocal cindent
+setlocal cinkeys=0{,0},0),:,0#,!^F,o,O,e
+setlocal cinoptions=
+setlocal cinwords=if,else,while,do,for,switch
+setlocal colorcolumn=
+setlocal comments=sO:*\ -,mO:*\ \ ,exO:*/,s1:/*,mb:*,ex:*/,://
+setlocal commentstring=/*%s*/
+setlocal complete=.,w,b,u,t,i
+setlocal concealcursor=
+setlocal conceallevel=0
+setlocal completefunc=youcompleteme#Complete
+setlocal nocopyindent
+setlocal cryptmethod=
+setlocal nocursorbind
+setlocal nocursorcolumn
+set cursorline
+setlocal cursorline
+setlocal define=^\\s*#\\s*define
+setlocal dictionary=
+setlocal nodiff
+setlocal equalprg=
+setlocal errorformat=
+setlocal expandtab
+if &filetype != 'cpp'
+setlocal filetype=cpp
+endif
+setlocal foldcolumn=0
+setlocal foldenable
+setlocal foldexpr=0
+setlocal foldignore=#
+setlocal foldlevel=0
+setlocal foldmarker={{{,}}}
+set foldmethod=syntax
+setlocal foldmethod=syntax
+setlocal foldminlines=1
+setlocal foldnestmax=20
+setlocal foldtext=foldtext()
+setlocal formatexpr=
+setlocal formatoptions=croql
+setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
+setlocal grepprg=
+setlocal iminsert=0
+setlocal imsearch=0
+setlocal include=
+setlocal includeexpr=
+setlocal indentexpr=
+setlocal indentkeys=0{,0},:,0#,!^F,o,O,e
+setlocal noinfercase
+setlocal iskeyword=@,48-57,_,192-255
+setlocal keywordprg=
+setlocal nolinebreak
+setlocal nolisp
+setlocal lispwords=
+setlocal nolist
+setlocal makeprg=
+setlocal matchpairs=(:),{:},[:]
+setlocal modeline
+setlocal modifiable
+setlocal nrformats=octal,hex
+set number
+setlocal number
+setlocal numberwidth=4
+setlocal omnifunc=youcompleteme#OmniComplete
+setlocal path=
+setlocal nopreserveindent
+setlocal nopreviewwindow
+setlocal quoteescape=\\
+setlocal noreadonly
+set relativenumber
+setlocal relativenumber
+setlocal norightleft
+setlocal rightleftcmd=search
+setlocal noscrollbind
+setlocal shiftwidth=2
+setlocal noshortname
+setlocal smartindent
+setlocal softtabstop=0
+setlocal nospell
+setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
+setlocal spellfile=
+setlocal spelllang=en
+setlocal statusline=%!airline#statusline(1)
+setlocal suffixesadd=
+setlocal swapfile
+setlocal synmaxcol=3000
+if &syntax != 'cpp'
+setlocal syntax=cpp
+endif
+setlocal tabstop=2
+setlocal tags=
+setlocal textwidth=0
+setlocal thesaurus=
+setlocal noundofile
+setlocal undolevels=-123456
+setlocal nowinfixheight
+setlocal nowinfixwidth
+setlocal wrap
+setlocal wrapmargin=0
+12
+normal! zo
+34
+normal! zo
+40
+normal! zo
+63
+normal! zo
+92
+normal! zo
+116
+normal! zo
+124
+normal! zo
+74
+normal! zo
+104
+normal! zo
+117
+normal! zo
+128
+normal! zo
+90
+normal! zo
+107
+normal! zo
+127
+normal! zo
+let s:l = 91 - ((32 * winheight(0) + 29) / 58)
+if s:l < 1 | let s:l = 1 | endif
+exe s:l
+normal! zt
+91
+normal! 03|
+tabnext 1
 if exists('s:wipebuf')
   silent exe 'bwipe ' . s:wipebuf
 endif
