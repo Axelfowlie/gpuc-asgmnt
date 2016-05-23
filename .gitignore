@@ -32,3 +32,24 @@
 
 *.swp
 *.xmp
+
+
+
+
+CPUDiscontinuities.pfm
+CPUResultBilateral.pfm
+CPUResultSeparable_box_4x4.pfm
+CPUResultSeparable_box_8x8.pfm
+CPUResultSeparable_gauss_3x3.pfm
+CPUResult3x3.pfm
+DifferenceImageBilateral.pfm
+DifferenceImageSeparable_box_4x4.pfm
+DifferenceImageSeparable_box_8x8.pfm
+DifferenceImageSeparable_gauss_3x3.pfm
+DifferenceImage3x3.pfm
+GPUDiscontinuities.pfm
+GPUResultBilateral.pfm
+GPUResultSeparable_box_4x4.pfm
+GPUResultSeparable_box_8x8.pfm
+GPUResultSeparable_gauss_3x3.pfm
+GPUResult3x3.pfm
