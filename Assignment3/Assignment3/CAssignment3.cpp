@@ -54,7 +54,7 @@ bool CAssignment3::DoCompute()
 				ConvKernel[i] = 1.0f / 9.0f;
 
 			CConvolutionSeparableTask convTask("box_4x4", "Images/input.pfm", HGroupSize, VGroupSize,
-				4, 4, 4, ConvKernel, ConvKernel);
+				3, 3, 4, ConvKernel, ConvKernel);
 			// note: the last argument is ignored, but our framework requires it
 			// for the horizontal and vertical passes different local sizes might be used
 			RunComputeTask(convTask, HGroupSize);
@@ -67,7 +67,7 @@ bool CAssignment3::DoCompute()
 				ConvKernel[i] = 1.0f / 17.0f;
 
 			CConvolutionSeparableTask convTask("box_8x8", "Images/input.pfm", HGroupSize, VGroupSize,
-				4, 4, 8, ConvKernel, ConvKernel);
+				3, 3, 8, ConvKernel, ConvKernel);
 			RunComputeTask(convTask, HGroupSize);
 		}
 
@@ -77,7 +77,7 @@ bool CAssignment3::DoCompute()
 				0.000817774f, 0.0286433f, 0.235018f, 0.471041f, 0.235018f, 0.0286433f, 0.000817774f
 			};
 			CConvolutionSeparableTask convTask("gauss_3x3", "Images/input.pfm", HGroupSize, VGroupSize,
-				4, 4, 3, ConvKernel, ConvKernel);
+				3, 3, 3, ConvKernel, ConvKernel);
 			RunComputeTask(convTask, HGroupSize);
 		}
 	}

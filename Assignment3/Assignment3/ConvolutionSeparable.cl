@@ -50,7 +50,6 @@ __kernel __attribute__((reqd_work_group_size(H_GROUPSIZE_X, H_GROUPSIZE_Y, 1))) 
   const int2 base = (int2)(H_RESULT_STEPS * H_GROUPSIZE_X * group + LID.x, get_global_id(1));
 
 
-
   // Initialize the halo's left border
   // Here we are loading the redundant memory, since branching would split the warp into a fraction that does, and one that does not load data.
   // Since the warp will load in a coalesced manner, it doesn't yield any benefit but makes the code harder to read...
@@ -76,6 +75,7 @@ __kernel __attribute__((reqd_work_group_size(H_GROUPSIZE_X, H_GROUPSIZE_Y, 1))) 
 
     // Convolve
     float out = 0;
+#pragma unroll
     for (int k = -KERNEL_RADIUS; k <= KERNEL_RADIUS; ++k) out += c_Kernel[KERNEL_RADIUS - k] * tile[LID.y][LID.x + off + H_GROUPSIZE_X + k];
 
     if (base.x + off < Width) d_Dst[base.y * Pitch + base.x + off] = out;
@@ -129,6 +129,7 @@ __kernel __attribute__((reqd_work_group_size(V_GROUPSIZE_X, V_GROUPSIZE_Y, 1))) 
 
     // Convolve
     float out = 0;
+#pragma unroll
     for (int k = -KERNEL_RADIUS; k <= KERNEL_RADIUS; ++k) out += c_Kernel[KERNEL_RADIUS - k] * tile[LID.y + off + V_GROUPSIZE_Y + k][LID.x];
 
     if (base.y + off < Height) d_Dst[(base.y + off) * Pitch + base.x] = out;
