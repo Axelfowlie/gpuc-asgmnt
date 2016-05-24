@@ -228,49 +228,39 @@ __kernel __attribute__((reqd_work_group_size(H_GROUPSIZE_X, H_GROUPSIZE_Y, 1))) 
   for (int i = 0; i < H_RESULT_STEPS; ++i) {
     int off = i * H_GROUPSIZE_X;
 
-    // Convolve
-    float out = 0;
-    float weight = 0;
+    // Center pixel
+    float out = c_Kernel[KERNEL_RADIUS] * tile[LID.y][LID.x + off + H_GROUPSIZE_X];
+    float weight = c_Kernel[KERNEL_RADIUS];
+
     // Walk towards left
-    for (int k = 1; k <= KERNEL_RADIUS; ++k) {
-      if ((disc[LID.y][LID.x + off + H_GROUPSIZE_X - k] & 0x0001) != 0) break;
-      out += c_Kernel[KERNEL_RADIUS - k] * tile[LID.y][LID.x + off + H_GROUPSIZE_X - k];
-      weight += c_Kernel[KERNEL_RADIUS - k];
+    for (int k = 0; k < KERNEL_RADIUS;) {
+      int flag = disc[LID.y][LID.x + off + H_GROUPSIZE_X - k];
+      if ((flag & 0x0001) != 0 || base.x - k <= 0) break;
+
+      ++k;
+
+      float w = c_Kernel[KERNEL_RADIUS - k];
+      out += w * tile[LID.y][LID.x + off + H_GROUPSIZE_X - k];
+      weight += w;
     }
     // Walk towards right
-    for (int k = 1; k <= KERNEL_RADIUS; ++k) {
-      if ((disc[LID.y][LID.x + off + H_GROUPSIZE_X + k] & 0x0002) != 0) break;
-      out += c_Kernel[KERNEL_RADIUS + k] * tile[LID.y][LID.x + off + H_GROUPSIZE_X + k];
-      weight += c_Kernel[KERNEL_RADIUS + k];
+    for (int k = 0; k < KERNEL_RADIUS; ) {
+      int flag = disc[LID.y][LID.x + off + H_GROUPSIZE_X + k];
+      if ((flag & 0x0002) != 0 || base.x + k > Width) break;
+
+      ++k;
+
+      float w = c_Kernel[KERNEL_RADIUS + k];
+      out += w * tile[LID.y][LID.x + off + H_GROUPSIZE_X + k];
+      weight += w;
     }
-    // Center pixel
-    out += c_Kernel[KERNEL_RADIUS] * tile[LID.y][LID.x + off + H_GROUPSIZE_X];
-    weight += c_Kernel[KERNEL_RADIUS];
 
-    if (base.x + off < Width) d_Dst[base.y * Pitch + base.x + off] = out / weight;
+    // Normalize
+    if (weight != 0) out /= weight;
+    else out = 0;
+
+    if (base.x + off < Width) d_Dst[base.y * Pitch + base.x + off] = out;
   }
-
-  // TODO
-  // This will be very similar to the separable convolution, except that you have
-  // also load the discontinuity buffer into the local memory
-  // Each work-item loads H_RESULT_STEPS values + 2 halo values
-  //__local float tile[H_GROUPSIZE_Y][(H_RESULT_STEPS + 2) * H_GROUPSIZE_X];
-  //__local int   disc[H_GROUPSIZE_Y][(H_RESULT_STEPS + 2) * H_GROUPSIZE_X];
-
-  // Load data to the tile and disc local arrays
-
-  // During the convolution iterate inside-out from the center pixel towards the borders.
-  // for (...) // Iterate over tiles
-
-  // When you iterate to the left, check for 'left' discontinuities.
-  // for (... > -KERNEL_RADIUS...)
-  // If you find relevant discontinuity, stop iterating
-
-  // When iterating to the right, check for 'right' discontinuities.
-  // for (... < KERNEL_RADIUS...)
-  // If you find a relevant discontinuity, stop iterating
-
-  // Don't forget to accumulate the weights to normalize the kernel (divide the pixel value by the summed weights)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -304,7 +294,7 @@ __kernel __attribute__((reqd_work_group_size(V_GROUPSIZE_X, V_GROUPSIZE_Y, 1))) 
 
 // Load region of processed pixels
 #pragma unroll
-  for (int i = 0; i < V_RESULT_STEPS; ++i) {
+  for (int i = 0; i <= V_RESULT_STEPS; ++i) {
     int off = i * V_GROUPSIZE_Y;
     elem = 0;
     dc = 0;
@@ -337,26 +327,38 @@ __kernel __attribute__((reqd_work_group_size(V_GROUPSIZE_X, V_GROUPSIZE_Y, 1))) 
   for (int i = 0; i < V_RESULT_STEPS; ++i) {
     int off = i * V_GROUPSIZE_Y;
 
-    // Convolve
-    float out = 0;
-    float weight = 0;
+    // Center pixel
+    float out = c_Kernel[KERNEL_RADIUS] * tile[LID.y + off + V_GROUPSIZE_Y][LID.x];
+    float weight = c_Kernel[KERNEL_RADIUS];
+
     // Walk towards top
-    for (int k = 1; k <= KERNEL_RADIUS; ++k) {
-      if ((disc[LID.y + off + V_GROUPSIZE_Y - k][LID.x] & 0x0004) != 0) break;
-      out += c_Kernel[KERNEL_RADIUS - k] * tile[LID.y + off + V_GROUPSIZE_Y - k][LID.x];
-      weight += c_Kernel[KERNEL_RADIUS - k];
+    for (int k = 0; k < KERNEL_RADIUS; ) {
+      int flag = disc[LID.y + off + V_GROUPSIZE_Y - k][LID.x];
+      if ((flag & 0x0004) != 0 || base.y - k <= 0) break;
+
+      ++k;
+
+      float w = c_Kernel[KERNEL_RADIUS - k];
+      out += w * tile[LID.y + off + V_GROUPSIZE_Y - k][LID.x];
+      weight += w;
     }
     // Walk towards bottom
-    for (int k = 1; k <= KERNEL_RADIUS; ++k) {
-      if ((disc[LID.y + off + V_GROUPSIZE_Y + k][LID.x] & 0x0008) != 0) break;
-      out += c_Kernel[KERNEL_RADIUS + k] * tile[LID.y + off + V_GROUPSIZE_Y + k][LID.x];
-      weight += c_Kernel[KERNEL_RADIUS + k];
-    }
-    // Center pixel
-    out += c_Kernel[KERNEL_RADIUS] * tile[LID.y + off + V_GROUPSIZE_Y][LID.x];
-    weight += c_Kernel[KERNEL_RADIUS];
+    for (int k = 0; k < KERNEL_RADIUS; ) {
+      int flag = disc[LID.y + off + V_GROUPSIZE_Y + k][LID.x];
+      if ((flag & 0x0008) != 0 || base.y + k > Height) break;
 
-    if (base.y + off < Height) d_Dst[(base.y + off) * Pitch + base.x] = out / weight;
+      ++k;
+
+      float w = c_Kernel[KERNEL_RADIUS + k];
+      out += w * tile[LID.y + off + V_GROUPSIZE_Y + k][LID.x];
+      weight += w;
+    }
+
+    // Normalize
+    if (weight != 0) out /= weight;
+    else out = 0;
+
+    if (base.y + off < Height) d_Dst[(base.y + off) * Pitch + base.x] = out;
   }
 }
 
