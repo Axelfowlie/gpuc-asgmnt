@@ -2,10 +2,10 @@ let SessionLoad = 1
 if &cp | set nocp | endif
 let s:cpo_save=&cpo
 set cpo&vim
-inoremap <C-Space> 
-imap <Nul> <C-Space>
-inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
 inoremap <expr> <Down> pumvisible() ? "\" : "\<Down>"
+inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
+imap <Nul> <C-Space>
+inoremap <C-Space> 
 imap <S-Tab> <Plug>SuperTabBackward
 inoremap <silent> <C-Tab> =UltiSnips#ListSnippets()
 map! <S-Insert> <MiddleMouse>
@@ -26,10 +26,10 @@ nnoremap  :tabclose
 nnoremap  :tab split:exec("tag ".expand("<cword>"))
 nnoremap   zz
 noremap <silent> $ g$
-nnoremap ,d :YcmShowDetailedDiagnostic
-nnoremap ,df :call ClangFormatFile()
-nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
 nnoremap ,ct :!ctags -R .
+nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
+nnoremap ,df :call ClangFormatFile()
+nnoremap ,d :YcmShowDetailedDiagnostic
 nmap ,hp <Plug>GitGutterPreviewHunk
 nmap ,hr <Plug>GitGutterRevertHunk
 nmap ,hs <Plug>GitGutterStageHunk
@@ -65,24 +65,24 @@ noremap <silent> k gk
 nnoremap n nzz
 nnoremap zL zMzR:call ToggleFoldComments()
 nnoremap zl :call ToggleFoldComments()
-noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
-noremap <silent> <Plug>AirlineSelectPrevTab gT
-noremap <silent> <Plug>AirlineSelectTab9 :9tabn
-noremap <silent> <Plug>AirlineSelectTab8 :8tabn
-noremap <silent> <Plug>AirlineSelectTab7 :7tabn
-noremap <silent> <Plug>AirlineSelectTab6 :6tabn
-noremap <silent> <Plug>AirlineSelectTab5 :5tabn
-noremap <silent> <Plug>AirlineSelectTab4 :4tabn
-noremap <silent> <Plug>AirlineSelectTab3 :3tabn
-noremap <silent> <Plug>AirlineSelectTab2 :2tabn
-noremap <silent> <Plug>AirlineSelectTab1 :1tabn
-noremap <F4> :FSHere
-map <F7> :make -C ./build/
-map <S-F7> :make clean all -C ./build/
-nnoremap <C-Up> :cw
-nnoremap <C-Down> :ccl
-nnoremap <C-Left> :cp
 nnoremap <C-Right> :cn
+nnoremap <C-Left> :cp
+nnoremap <C-Down> :ccl
+nnoremap <C-Up> :cw
+map <S-F7> :make clean all -C ./build/
+map <F7> :make -C ./build/
+noremap <F4> :FSHere
+noremap <silent> <Plug>AirlineSelectTab1 :1tabn
+noremap <silent> <Plug>AirlineSelectTab2 :2tabn
+noremap <silent> <Plug>AirlineSelectTab3 :3tabn
+noremap <silent> <Plug>AirlineSelectTab4 :4tabn
+noremap <silent> <Plug>AirlineSelectTab5 :5tabn
+noremap <silent> <Plug>AirlineSelectTab6 :6tabn
+noremap <silent> <Plug>AirlineSelectTab7 :7tabn
+noremap <silent> <Plug>AirlineSelectTab8 :8tabn
+noremap <silent> <Plug>AirlineSelectTab9 :9tabn
+noremap <silent> <Plug>AirlineSelectPrevTab gT
+noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
 vnoremap <silent> <Plug>NetrwBrowseXVis :call netrw#BrowseXVis()
 nnoremap <silent> <Plug>NetrwBrowseX :call netrw#BrowseX(expand((exists("g:netrw_gx")? g:netrw_gx : '<cfile>')),netrw#CheckIfRemote())
 snoremap <silent> <Del> c
@@ -139,6 +139,7 @@ set fileencodings=ucs-bom,utf-8,default,latin1
 set guifont=Droid\ Sans\ Mono\ 10
 set guioptions=agimt
 set helplang=en
+set hlsearch
 set iminsert=0
 set imsearch=0
 set laststatus=2
@@ -170,11 +171,17 @@ if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
 endif
 set shortmess=aoO
 badd +1 Assignment3/CAssignment3.cpp
-badd +1 Assignment3/CHistogramTask.cpp
+badd +184 Assignment3/CHistogramTask.cpp
 badd +1 Assignment3/Convolution3x3.cl
-badd +1 Assignment3/CConvolutionSeparableTask.cpp
+badd +149 Assignment3/CConvolutionSeparableTask.cpp
 badd +1 Assignment3/ConvolutionSeparable.cl
-badd +0 Assignment3/ConvolutionBilateral.cl
+badd +1 Assignment3/ConvolutionBilateral.cl
+badd +0 Assignment3/histogram.cl
+badd +11 Assignment3/CHistogramTask.h
+badd +201 Assignment3/CConvolutionBilateralTask.cpp
+badd +38 Assignment3/CConvolutionBilateralTask.h
+badd +29 Assignment3/CConvolutionSeparableTask.h
+badd +0 Assignment3/CConvolutionTaskBase.cpp
 argglobal
 silent! argdel *
 edit Assignment3/CAssignment3.cpp
@@ -293,26 +300,18 @@ setlocal wrap
 setlocal wrapmargin=0
 21
 normal! zo
-31
+101
 normal! zo
-33
+103
 normal! zo
-45
+108
 normal! zo
-50
-normal! zo
-63
-normal! zo
-74
-normal! zo
-76
-normal! zo
-let s:l = 48 - ((25 * winheight(0) + 32) / 65)
+let s:l = 102 - ((101 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-48
-normal! 0
+102
+normal! 030|
 tabedit Assignment3/Convolution3x3.cl
 set splitbelow splitright
 wincmd t
@@ -561,6 +560,132 @@ exe s:l
 normal! zt
 91
 normal! 0
+tabedit Assignment3/CConvolutionTaskBase.cpp
+set splitbelow splitright
+wincmd t
+set winheight=1 winwidth=1
+argglobal
+setlocal keymap=
+setlocal noarabic
+setlocal autoindent
+setlocal backupcopy=
+setlocal balloonexpr=
+setlocal nobinary
+setlocal nobreakindent
+setlocal breakindentopt=
+setlocal bufhidden=
+setlocal buflisted
+setlocal buftype=
+setlocal cindent
+setlocal cinkeys=0{,0},0),:,0#,!^F,o,O,e
+setlocal cinoptions=
+setlocal cinwords=if,else,while,do,for,switch
+setlocal colorcolumn=
+setlocal comments=sO:*\ -,mO:*\ \ ,exO:*/,s1:/*,mb:*,ex:*/,://
+setlocal commentstring=/*%s*/
+setlocal complete=.,w,b,u,t,i
+setlocal concealcursor=
+setlocal conceallevel=0
+setlocal completefunc=youcompleteme#Complete
+setlocal nocopyindent
+setlocal cryptmethod=
+setlocal nocursorbind
+setlocal nocursorcolumn
+set cursorline
+setlocal cursorline
+setlocal define=
+setlocal dictionary=
+setlocal nodiff
+setlocal equalprg=
+setlocal errorformat=
+setlocal expandtab
+if &filetype != 'cpp'
+setlocal filetype=cpp
+endif
+setlocal foldcolumn=0
+setlocal foldenable
+setlocal foldexpr=0
+setlocal foldignore=#
+setlocal foldlevel=0
+setlocal foldmarker={{{,}}}
+set foldmethod=syntax
+setlocal foldmethod=syntax
+setlocal foldminlines=1
+setlocal foldnestmax=20
+setlocal foldtext=foldtext()
+setlocal formatexpr=
+setlocal formatoptions=croql
+setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
+setlocal grepprg=
+setlocal iminsert=0
+setlocal imsearch=0
+setlocal include=
+setlocal includeexpr=
+setlocal indentexpr=
+setlocal indentkeys=0{,0},:,0#,!^F,o,O,e
+setlocal noinfercase
+setlocal iskeyword=@,48-57,_,192-255
+setlocal keywordprg=
+setlocal nolinebreak
+setlocal nolisp
+setlocal lispwords=
+setlocal nolist
+setlocal makeprg=
+setlocal matchpairs=(:),{:},[:]
+setlocal modeline
+setlocal modifiable
+setlocal nrformats=octal,hex
+set number
+setlocal number
+setlocal numberwidth=4
+setlocal omnifunc=youcompleteme#OmniComplete
+setlocal path=
+setlocal nopreserveindent
+setlocal nopreviewwindow
+setlocal quoteescape=\\
+setlocal noreadonly
+set relativenumber
+setlocal relativenumber
+setlocal norightleft
+setlocal rightleftcmd=search
+setlocal noscrollbind
+setlocal shiftwidth=2
+setlocal noshortname
+setlocal smartindent
+setlocal softtabstop=0
+setlocal nospell
+setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
+setlocal spellfile=
+setlocal spelllang=en
+setlocal statusline=%!airline#statusline(1)
+setlocal suffixesadd=
+setlocal swapfile
+setlocal synmaxcol=3000
+if &syntax != 'cpp'
+setlocal syntax=cpp
+endif
+setlocal tabstop=2
+setlocal tags=
+setlocal textwidth=0
+setlocal thesaurus=
+setlocal noundofile
+setlocal undolevels=-123456
+setlocal nowinfixheight
+setlocal nowinfixwidth
+setlocal wrap
+setlocal wrapmargin=0
+119
+normal! zo
+132
+normal! zo
+140
+normal! zo
+let s:l = 146 - ((120 * winheight(0) + 32) / 65)
+if s:l < 1 | let s:l = 1 | endif
+exe s:l
+normal! zt
+146
+normal! 059|
 tabedit Assignment3/ConvolutionBilateral.cl
 set splitbelow splitright
 wincmd t
@@ -675,13 +800,157 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
-let s:l = 325 - ((229 * winheight(0) + 32) / 65)
+184
+normal! zo
+203
+normal! zo
+212
+normal! zo
+216
+normal! zo
+228
+normal! zo
+236
+normal! zo
+247
+normal! zo
+let s:l = 212 - ((112 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-325
-normal! 01|
-tabnext 4
+212
+normal! 0
+tabedit Assignment3/histogram.cl
+set splitbelow splitright
+wincmd t
+set winheight=1 winwidth=1
+argglobal
+setlocal keymap=
+setlocal noarabic
+setlocal autoindent
+setlocal backupcopy=
+setlocal balloonexpr=
+setlocal nobinary
+setlocal nobreakindent
+setlocal breakindentopt=
+setlocal bufhidden=
+setlocal buflisted
+setlocal buftype=
+setlocal cindent
+setlocal cinkeys=0{,0},0),:,0#,!^F,o,O,e
+setlocal cinoptions=
+setlocal cinwords=if,else,while,do,for,switch
+setlocal colorcolumn=
+setlocal comments=sO:*\ -,mO:*\ \ ,exO:*/,s1:/*,mb:*,ex:*/,://
+setlocal commentstring=/*%s*/
+setlocal complete=.,w,b,u,t,i
+setlocal concealcursor=
+setlocal conceallevel=0
+setlocal completefunc=youcompleteme#Complete
+setlocal nocopyindent
+setlocal cryptmethod=
+setlocal nocursorbind
+setlocal nocursorcolumn
+set cursorline
+setlocal cursorline
+setlocal define=^\\s*#\\s*define
+setlocal dictionary=
+setlocal nodiff
+setlocal equalprg=
+setlocal errorformat=
+setlocal expandtab
+if &filetype != 'cpp'
+setlocal filetype=cpp
+endif
+setlocal foldcolumn=0
+setlocal foldenable
+setlocal foldexpr=0
+setlocal foldignore=#
+setlocal foldlevel=0
+setlocal foldmarker={{{,}}}
+set foldmethod=syntax
+setlocal foldmethod=syntax
+setlocal foldminlines=1
+setlocal foldnestmax=20
+setlocal foldtext=foldtext()
+setlocal formatexpr=
+setlocal formatoptions=croql
+setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
+setlocal grepprg=
+setlocal iminsert=0
+setlocal imsearch=0
+setlocal include=
+setlocal includeexpr=
+setlocal indentexpr=
+setlocal indentkeys=0{,0},:,0#,!^F,o,O,e
+setlocal noinfercase
+setlocal iskeyword=@,48-57,_,192-255
+setlocal keywordprg=
+setlocal nolinebreak
+setlocal nolisp
+setlocal lispwords=
+setlocal nolist
+setlocal makeprg=
+setlocal matchpairs=(:),{:},[:]
+setlocal modeline
+setlocal modifiable
+setlocal nrformats=octal,hex
+set number
+setlocal number
+setlocal numberwidth=4
+setlocal omnifunc=youcompleteme#OmniComplete
+setlocal path=
+setlocal nopreserveindent
+setlocal nopreviewwindow
+setlocal quoteescape=\\
+setlocal noreadonly
+set relativenumber
+setlocal relativenumber
+setlocal norightleft
+setlocal rightleftcmd=search
+setlocal noscrollbind
+setlocal shiftwidth=2
+setlocal noshortname
+setlocal smartindent
+setlocal softtabstop=0
+setlocal nospell
+setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
+setlocal spellfile=
+setlocal spelllang=en
+setlocal statusline=%!airline#statusline(1)
+setlocal suffixesadd=
+setlocal swapfile
+setlocal synmaxcol=3000
+if &syntax != 'cpp'
+setlocal syntax=cpp
+endif
+setlocal tabstop=2
+setlocal tags=
+setlocal textwidth=0
+setlocal thesaurus=
+setlocal noundofile
+setlocal undolevels=-123456
+setlocal nowinfixheight
+setlocal nowinfixwidth
+setlocal wrap
+setlocal wrapmargin=0
+13
+normal! zo
+15
+normal! zo
+28
+normal! zo
+28
+normal! zo
+35
+normal! zo
+let s:l = 31 - ((30 * winheight(0) + 32) / 65)
+if s:l < 1 | let s:l = 1 | endif
+exe s:l
+normal! zt
+31
+normal! 0
+tabnext 5
 if exists('s:wipebuf')
   silent exe 'bwipe ' . s:wipebuf
 endif
