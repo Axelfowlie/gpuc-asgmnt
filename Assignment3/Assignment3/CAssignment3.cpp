@@ -99,7 +99,7 @@ bool CAssignment3::DoCompute()
 	cout<<endl<<"########################################"<<endl;
 	cout<<"Task 4: Histogram"<<endl<<endl;
 	{
-		size_t group_size[2] = {32, 32};
+		size_t group_size[2] = {16, 8};
 		{
 			CHistogramTask histogram(0.25f, 0.26f, false, "Images/input.pfm");
 			RunComputeTask(histogram, group_size);
