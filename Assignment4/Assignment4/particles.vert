@@ -30,9 +30,9 @@ void main() {
 
 
 	//if (v.w <= 0.f)
-		//gl_FrontColor = vec4(1.0, 0.0, 0.0, 1.0);
+	//	gl_FrontColor = vec4(1.0, 0.0, 0.0, 1.0);
 	//else
-		//gl_FrontColor = vec4(0.0, 1.0, 0.0, 1.0);
+	//	gl_FrontColor = vec4(0.0, 1.0, 0.0, 1.0);
 	//
 	//the w coordinate is the life, if the particle is dead throw it outside the frustum
 	if (v.w <= 0.f)

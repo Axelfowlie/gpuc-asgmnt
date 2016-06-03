@@ -14,5 +14,13 @@ __kernel void ScanAdd(__global uint* higherLevelArray, __global uint* outArray, 
 {}
 
 __kernel void ScanNaive(const __global uint* inArray, __global uint* outArray, uint N, uint offset) 
-{}
+{
+  int GID = get_global_id(0);
+
+  if (GID >= N) return;
+
+  uint elem = inArray[GID];
+  if (offset <= GID) elem += inArray[GID - offset];
+  outArray[GID] = elem;
+}
 

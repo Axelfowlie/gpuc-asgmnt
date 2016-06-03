@@ -109,7 +109,7 @@ bool CParticleSystemTask::InitResources(cl_device_id Device, cl_context Context)
 		pPosLife[i].s[0] = (float(rand()) / float(RAND_MAX) * 0.5f + 0.25f);
 		pPosLife[i].s[1] = (float(rand()) / float(RAND_MAX) * 0.5f + 0.25f);
 		pPosLife[i].s[2] = (float(rand()) / float(RAND_MAX) * 0.5f + 0.25f);
-		pPosLife[i].s[3] = 100.f + 5.f * (float(rand()) / float(RAND_MAX));
+		pPosLife[i].s[3] = 1.f + 5.f * (float(rand()) / float(RAND_MAX));
 
 		// if (i & 1)
 		// 	pPosLife[i].s[3] = 0.f;
@@ -470,8 +470,8 @@ void CParticleSystemTask::ComputeGPU(cl_context Context, cl_command_queue Comman
 	// TO DO: 
 	// Enable these once you implement them
 	// Stream compaction
-	//Scan(Context, CommandQueue, LocalWorkSize);
-	//Reorganize(Context, CommandQueue, LocalWorkSize);
+	Scan(Context, CommandQueue, LocalWorkSize);
+	Reorganize(Context, CommandQueue, LocalWorkSize);
 
 
 	V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clPosLife[0], 0, NULL, NULL),  "Error releasing OpenGL buffer.");
@@ -657,16 +657,30 @@ void CParticleSystemTask::OnWindowResized(int Width, int Height)
 
 void CParticleSystemTask::Scan(cl_context , cl_command_queue CommandQueue, size_t LocalWorkSize[3])
 {
+  cl_int clErr;
+  size_t globalWorkSize[1];
+  size_t localWorkSize[1] = {LocalWorkSize[0]};
+  size_t offset = 1;
+  size_t N = m_nParticles * 2;
 
+  while (offset < N) {
+    // Spawn as many threads as there are elements in the array.
+    globalWorkSize[0] = CLUtil::GetGlobalWorkSize(N, localWorkSize[0]);
 
-	//********************************************************
-	// GPU Computing only!
-	// (If you are doing the smaller course, ignore this function)
-	//********************************************************
+    // Set the kernel arguments, read-write buffer, the stride and the size of the array and launch the kernel
+    if (offset == 1) clErr = clSetKernelArg(m_ScanNaiveKernel, 0, sizeof(cl_mem), (void*)&m_clAlive);
+    else clErr = clSetKernelArg(m_ScanNaiveKernel, 0, sizeof(cl_mem), (void*)&m_clPingArray);
+    clErr |= clSetKernelArg(m_ScanNaiveKernel, 1, sizeof(cl_mem), (void*)&m_clPongArray);
+    clErr |= clSetKernelArg(m_ScanNaiveKernel, 2, sizeof(cl_uint), (void*)&N);
+    clErr |= clSetKernelArg(m_ScanNaiveKernel, 3, sizeof(cl_uint), (void*)&offset);
+    V_RETURN_CL(clErr, "Error setting kernel arguments.");
+    clErr = clEnqueueNDRangeKernel(CommandQueue, m_ScanNaiveKernel, 1, NULL, globalWorkSize, localWorkSize, 0, NULL, NULL);
+    V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 
-	// Add your favorite prefix sum code here from Assignment 2 :)
-
-
+    // Offsets gets doubled in each iteration
+    offset <<= 1;
+    swap(m_clPingArray, m_clPongArray);
+  }
 }
 
 
@@ -692,6 +706,8 @@ void CParticleSystemTask::Integrate(cl_context , cl_command_queue CommandQueue, 
 	V_RETURN_CL(clErr, "Failed to set args for m_IntegrateKernel");
 	clErr = clEnqueueNDRangeKernel(CommandQueue, m_IntegrateKernel, 1, NULL, globalWorkSize, LocalWorkSize, 0, NULL, NULL);
 	V_RETURN_CL(clErr, "Error executing m_IntegrateKernel!");
+
+
 }
 
 void CParticleSystemTask::Reorganize(cl_context , cl_command_queue CommandQueue, size_t LocalWorkSize[3])
@@ -701,18 +717,39 @@ void CParticleSystemTask::Reorganize(cl_context , cl_command_queue CommandQueue,
 	// GPU Computing only!
 	// (If you are doing the smaller course, ignore this function)
 	//********************************************************
+  //
 
 	// Clear
 	// ADD YOUR CODE HERE
 
+	//detemine the necessary number of global work items
+  size_t globalWorkSize[1];
+	globalWorkSize[0] = CLUtil::GetGlobalWorkSize(m_nParticles * 2, LocalWorkSize[0]);
+	//set kernel args
+	cl_int clErr = clSetKernelArg(m_ClearKernel, 0, sizeof(cl_mem), (void*)&m_clPosLife[1]);
+	clErr |= clSetKernelArg(m_ClearKernel, 1, sizeof(cl_mem), (void*)&m_clVelMass[1]);
+	V_RETURN_CL(clErr, "Failed to set args for m_ClearKernel");
+	clErr = clEnqueueNDRangeKernel(CommandQueue, m_ClearKernel, 1, NULL, globalWorkSize, LocalWorkSize, 0, NULL, NULL);
+	V_RETURN_CL(clErr, "Error executing m_ClearKernel!");
+
+
 	// Reorganize (perform the actual compaction)
 	// ADD YOUR CODE HERE
+  
+	clErr = clSetKernelArg(m_ReorganizeKernel, 0, sizeof(cl_mem), (void*)&m_clAlive);
+	clErr |= clSetKernelArg(m_ReorganizeKernel, 1, sizeof(cl_mem), (void*)&m_clPingArray);
+	clErr |= clSetKernelArg(m_ReorganizeKernel, 2, sizeof(cl_mem), (void*)&m_clPosLife[0]);
+	clErr |= clSetKernelArg(m_ReorganizeKernel, 3, sizeof(cl_mem), (void*)&m_clVelMass[0]);
+	clErr |= clSetKernelArg(m_ReorganizeKernel, 4, sizeof(cl_mem), (void*)&m_clPosLife[1]);
+	clErr |= clSetKernelArg(m_ReorganizeKernel, 5, sizeof(cl_mem), (void*)&m_clVelMass[1]);
+	clErr |= clSetKernelArg(m_ReorganizeKernel, 6, sizeof(cl_uint), (void*)&m_nParticles);
+	V_RETURN_CL(clErr, "Failed to set args for m_ReorganizeKernel");
+	clErr = clEnqueueNDRangeKernel(CommandQueue, m_ReorganizeKernel, 1, NULL, globalWorkSize, LocalWorkSize, 0, NULL, NULL);
+	V_RETURN_CL(clErr, "Error executing m_ReorganizeKernel!");
 
 
 	std::swap(m_clPosLife[0],	 m_clPosLife[1]);
 	std::swap(m_clVelMass[0],	 m_clVelMass[1]);
-	std::swap(m_glPosLife[0],	 m_glPosLife[1]);
-	std::swap(m_glVelMass[0],	 m_glVelMass[1]);
 	std::swap(m_glTexVelMass[0], m_glTexVelMass[1]);	
 }
 
