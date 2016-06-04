@@ -210,6 +210,20 @@ __kernel void Integrate(__global uint* gAlive, __read_only image3d_t gForceField
       gAlive[get_global_id(0) + nParticles] = 1;
     }
   } else
+    // This is needed, so that the stream compaction works
+    // Without setting the particle alive status to 0, there could be undefined values in the alive buffer.
+    // In this case the scan may sum up to values, that are larger than 2*N and we get OUT_OF_RESOURCES errors in the reorder kernel.
+    // Practically this line prevents the creation of more than N particles in total
+    // However this kernel is executed only for the first N particles, so newly created particles,
+    // that do not get into the first half of the particle buffer during compaction, do not get updated anyway.
+    // If they do not get updated, I decided that I could delete them anyway...
+    // Possible alternative solution:
+    //    Initialize the gAlive buffer with zeros,
+    //    call this update Kernel on all 2*N particles
+    //    and check before updating anything, if the particle is alive...
+    // Problem here is, that in this case we can not handle hall particles the same way, when it comes to spawning new ones
+    // (we would need a buffer of flags indicating which particle spawns a new one (and maybe why), 
+    // then do the compaction, and then spawn the particles at the end of the buffer)
     gAlive[get_global_id(0) + nParticles] = 0;
 }
 
