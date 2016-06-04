@@ -2,10 +2,10 @@ let SessionLoad = 1
 if &cp | set nocp | endif
 let s:cpo_save=&cpo
 set cpo&vim
-inoremap <expr> <Down> pumvisible() ? "\" : "\<Down>"
-inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
-imap <Nul> <C-Space>
 inoremap <C-Space> 
+imap <Nul> <C-Space>
+inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
+inoremap <expr> <Down> pumvisible() ? "\" : "\<Down>"
 imap <S-Tab> <Plug>SuperTabBackward
 inoremap <silent> <C-Tab> =UltiSnips#ListSnippets()
 map! <S-Insert> <MiddleMouse>
@@ -26,10 +26,10 @@ nnoremap  :tabclose
 nnoremap  :tab split:exec("tag ".expand("<cword>"))
 nnoremap   zz
 noremap <silent> $ g$
-nnoremap ,d :YcmShowDetailedDiagnostic
-nnoremap ,df :call ClangFormatFile()
-nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
 nnoremap ,ct :!ctags -R .
+nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
+nnoremap ,df :call ClangFormatFile()
+nnoremap ,d :YcmShowDetailedDiagnostic
 nmap ,hp <Plug>GitGutterPreviewHunk
 nmap ,hr <Plug>GitGutterRevertHunk
 nmap ,hs <Plug>GitGutterStageHunk
@@ -65,24 +65,24 @@ noremap <silent> k gk
 nnoremap n nzz
 nnoremap zL zMzR:call ToggleFoldComments()
 nnoremap zl :call ToggleFoldComments()
-noremap <silent> <Plug>AirlineSelectTab1 :1tabn
-noremap <silent> <Plug>AirlineSelectTab2 :2tabn
-noremap <silent> <Plug>AirlineSelectTab3 :3tabn
-noremap <silent> <Plug>AirlineSelectTab4 :4tabn
-noremap <silent> <Plug>AirlineSelectTab5 :5tabn
-noremap <silent> <Plug>AirlineSelectTab6 :6tabn
-noremap <silent> <Plug>AirlineSelectTab7 :7tabn
-noremap <silent> <Plug>AirlineSelectTab8 :8tabn
-noremap <silent> <Plug>AirlineSelectTab9 :9tabn
-noremap <silent> <Plug>AirlineSelectPrevTab gT
-noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
-noremap <F4> :FSHere
-map <F7> :make -C ./build/
-map <S-F7> :make clean all -C ./build/
-nnoremap <C-Up> :cw
-nnoremap <C-Down> :ccl
-nnoremap <C-Left> :cp
 nnoremap <C-Right> :cn
+nnoremap <C-Left> :cp
+nnoremap <C-Down> :ccl
+nnoremap <C-Up> :cw
+map <S-F7> :make clean all -C ./build/
+map <F7> :make -C ./build/
+noremap <F4> :FSHere
+noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
+noremap <silent> <Plug>AirlineSelectPrevTab gT
+noremap <silent> <Plug>AirlineSelectTab9 :9tabn
+noremap <silent> <Plug>AirlineSelectTab8 :8tabn
+noremap <silent> <Plug>AirlineSelectTab7 :7tabn
+noremap <silent> <Plug>AirlineSelectTab6 :6tabn
+noremap <silent> <Plug>AirlineSelectTab5 :5tabn
+noremap <silent> <Plug>AirlineSelectTab4 :4tabn
+noremap <silent> <Plug>AirlineSelectTab3 :3tabn
+noremap <silent> <Plug>AirlineSelectTab2 :2tabn
+noremap <silent> <Plug>AirlineSelectTab1 :1tabn
 vnoremap <silent> <Plug>NetrwBrowseXVis :call netrw#BrowseXVis()
 nnoremap <silent> <Plug>NetrwBrowseX :call netrw#BrowseX(expand((exists("g:netrw_gx")? g:netrw_gx : '<cfile>')),netrw#CheckIfRemote())
 snoremap <silent> <Del> c
@@ -152,6 +152,7 @@ set shortmess=filnxtToOc
 set showmatch
 set showtabline=2
 set smartindent
+set spelllang=en_us
 set splitbelow
 set splitright
 set suffixes=.bak,~,.swp,.o,.info,.aux,.log,.dvi,.bbl,.blg,.brf,.cb,.ind,.idx,.ilg,.inx,.out,.toc
@@ -175,8 +176,14 @@ badd +1 Assignment4/CParticleSystemTask.cpp
 badd +1 Assignment4/ParticleSystem.cl
 badd +1 Assignment4/particles.vert
 badd +1 Assignment4/Scan.cl
-badd +0 Assignment4/CClothSimulationTask.cpp
-badd +0 Assignment4/clothsim.cl
+badd +223 Assignment4/CClothSimulationTask.cpp
+badd +1 Assignment4/clothsim.cl
+badd +0 Assignment4/CClothSimulationTask.h
+badd +46 Common/IComputeTask.h
+badd +1 Common/IComputeTask.cpp
+badd +0 Common/IGUIEnabledComputeTask.h
+badd +39 Common/CAssignmentBase.h
+badd +0 /media/hakononakani/Storage/uni/gpuc/gpuc-asgmnt/Assignment4/Common/CAssignmentBase.cpp
 argglobal
 silent! argdel *
 edit Assignment4/CAssignment4.cpp
@@ -236,7 +243,7 @@ setlocal formatexpr=
 setlocal formatoptions=croql
 setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
 setlocal grepprg=
-setlocal iminsert=2
+setlocal iminsert=0
 setlocal imsearch=0
 setlocal include=
 setlocal includeexpr=
@@ -297,14 +304,18 @@ setlocal wrapmargin=0
 normal! zo
 45
 normal! zo
+45
+normal! zo
 79
 normal! zo
 83
 normal! zo
 89
 normal! zo
-112
+122
 normal! zo
+122
+normal! zc
 225
 normal! zo
 225
@@ -317,134 +328,12 @@ normal! zo
 normal! zo
 293
 normal! zc
-let s:l = 49 - ((37 * winheight(0) + 32) / 65)
+let s:l = 45 - ((30 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-49
-normal! 038|
-tabedit Assignment4/CParticleSystemTask.h
-set splitbelow splitright
-wincmd t
-set winheight=1 winwidth=1
-argglobal
-setlocal keymap=
-setlocal noarabic
-setlocal autoindent
-setlocal backupcopy=
-setlocal balloonexpr=
-setlocal nobinary
-setlocal nobreakindent
-setlocal breakindentopt=
-setlocal bufhidden=
-setlocal buflisted
-setlocal buftype=
-setlocal cindent
-setlocal cinkeys=0{,0},0),:,0#,!^F,o,O,e
-setlocal cinoptions=
-setlocal cinwords=if,else,while,do,for,switch
-setlocal colorcolumn=
-setlocal comments=sO:*\ -,mO:*\ \ ,exO:*/,s1:/*,mb:*,ex:*/,://
-setlocal commentstring=/*%s*/
-setlocal complete=.,w,b,u,t,i
-setlocal concealcursor=
-setlocal conceallevel=0
-setlocal completefunc=youcompleteme#Complete
-setlocal nocopyindent
-setlocal cryptmethod=
-setlocal nocursorbind
-setlocal nocursorcolumn
-set cursorline
-setlocal cursorline
-setlocal define=
-setlocal dictionary=
-setlocal nodiff
-setlocal equalprg=
-setlocal errorformat=
-setlocal expandtab
-if &filetype != 'cpp'
-setlocal filetype=cpp
-endif
-setlocal foldcolumn=0
-setlocal foldenable
-setlocal foldexpr=0
-setlocal foldignore=#
-setlocal foldlevel=0
-setlocal foldmarker={{{,}}}
-set foldmethod=syntax
-setlocal foldmethod=syntax
-setlocal foldminlines=1
-setlocal foldnestmax=20
-setlocal foldtext=foldtext()
-setlocal formatexpr=
-setlocal formatoptions=croql
-setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
-setlocal grepprg=
-setlocal iminsert=2
-setlocal imsearch=2
-setlocal include=
-setlocal includeexpr=
-setlocal indentexpr=
-setlocal indentkeys=0{,0},:,0#,!^F,o,O,e
-setlocal noinfercase
-setlocal iskeyword=@,48-57,_,192-255
-setlocal keywordprg=
-setlocal nolinebreak
-setlocal nolisp
-setlocal lispwords=
-setlocal nolist
-setlocal makeprg=
-setlocal matchpairs=(:),{:},[:]
-setlocal modeline
-setlocal modifiable
-setlocal nrformats=octal,hex
-set number
-setlocal number
-setlocal numberwidth=4
-setlocal omnifunc=youcompleteme#OmniComplete
-setlocal path=
-setlocal nopreserveindent
-setlocal nopreviewwindow
-setlocal quoteescape=\\
-setlocal noreadonly
-set relativenumber
-setlocal relativenumber
-setlocal norightleft
-setlocal rightleftcmd=search
-setlocal noscrollbind
-setlocal shiftwidth=2
-setlocal noshortname
-setlocal smartindent
-setlocal softtabstop=0
-setlocal nospell
-setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
-setlocal spellfile=
-setlocal spelllang=en
-setlocal statusline=%!airline#statusline(1)
-setlocal suffixesadd=
-setlocal swapfile
-setlocal synmaxcol=3000
-if &syntax != 'cpp'
-setlocal syntax=cpp
-endif
-setlocal tabstop=2
-setlocal tags=
-setlocal textwidth=0
-setlocal thesaurus=
-setlocal noundofile
-setlocal undolevels=-123456
-setlocal nowinfixheight
-setlocal nowinfixwidth
-setlocal wrap
-setlocal wrapmargin=0
-37
-normal! zo
-let s:l = 96 - ((27 * winheight(0) + 32) / 65)
-if s:l < 1 | let s:l = 1 | endif
-exe s:l
-normal! zt
-96
-normal! 0
+45
+normal! 05|
 tabedit Assignment4/CParticleSystemTask.cpp
 set splitbelow splitright
 wincmd t
@@ -561,21 +450,89 @@ setlocal wrap
 setlocal wrapmargin=0
 80
 normal! zo
-454
+397
 normal! zo
-659
+399
 normal! zo
-666
+456
 normal! zo
-688
+489
 normal! zo
-714
+562
 normal! zo
-let s:l = 684 - ((38 * winheight(0) + 32) / 65)
+580
+normal! zo
+584
+normal! zo
+591
+normal! zo
+597
+normal! zo
+598
+normal! zo
+601
+normal! zo
+607
+normal! zo
+613
+normal! zo
+630
+normal! zo
+650
+normal! zo
+661
+normal! zo
+668
+normal! zo
+690
+normal! zo
+716
+normal! zo
+80
+normal! zc
+397
+normal! zo
+399
+normal! zo
+456
+normal! zo
+489
+normal! zo
+562
+normal! zo
+580
+normal! zo
+584
+normal! zo
+591
+normal! zo
+597
+normal! zo
+598
+normal! zo
+601
+normal! zo
+607
+normal! zo
+613
+normal! zo
+630
+normal! zo
+650
+normal! zo
+661
+normal! zo
+668
+normal! zo
+690
+normal! zo
+716
+normal! zo
+let s:l = 78 - ((51 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-684
+78
 normal! 0
 tabedit Assignment4/ParticleSystem.cl
 set splitbelow splitright
@@ -691,6 +648,18 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
+62
+normal! zo
+72
+normal! zo
+72
+normal! zc
+97
+normal! zo
+104
+normal! zo
+108
+normal! zo
 143
 normal! zo
 200
@@ -699,12 +668,12 @@ normal! zo
 normal! zo
 232
 normal! zo
-let s:l = 198 - ((29 * winheight(0) + 32) / 65)
+let s:l = 107 - ((86 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-198
-normal! 059|
+107
+normal! 05|
 tabedit Assignment4/Scan.cl
 set splitbelow splitright
 wincmd t
@@ -827,7 +796,7 @@ exe s:l
 normal! zt
 18
 normal! 03|
-tabedit Assignment4/CClothSimulationTask.cpp
+tabedit Assignment4/CClothSimulationTask.h
 set splitbelow splitright
 wincmd t
 set winheight=1 winwidth=1
@@ -941,16 +910,178 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
-240
+35
 normal! zo
-267
-normal! zo
-let s:l = 269 - ((25 * winheight(0) + 32) / 65)
+let s:l = 42 - ((41 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-269
-normal! 049|
+42
+normal! 099|
+tabedit Assignment4/CClothSimulationTask.cpp
+set splitbelow splitright
+wincmd t
+set winheight=1 winwidth=1
+argglobal
+setlocal keymap=
+setlocal noarabic
+setlocal autoindent
+setlocal backupcopy=
+setlocal balloonexpr=
+setlocal nobinary
+setlocal nobreakindent
+setlocal breakindentopt=
+setlocal bufhidden=
+setlocal buflisted
+setlocal buftype=
+setlocal cindent
+setlocal cinkeys=0{,0},0),:,0#,!^F,o,O,e
+setlocal cinoptions=
+setlocal cinwords=if,else,while,do,for,switch
+setlocal colorcolumn=
+setlocal comments=sO:*\ -,mO:*\ \ ,exO:*/,s1:/*,mb:*,ex:*/,://
+setlocal commentstring=/*%s*/
+setlocal complete=.,w,b,u,t,i
+setlocal concealcursor=
+setlocal conceallevel=0
+setlocal completefunc=youcompleteme#Complete
+setlocal nocopyindent
+setlocal cryptmethod=
+setlocal nocursorbind
+setlocal nocursorcolumn
+set cursorline
+setlocal cursorline
+setlocal define=
+setlocal dictionary=
+setlocal nodiff
+setlocal equalprg=
+setlocal errorformat=
+setlocal expandtab
+if &filetype != 'cpp'
+setlocal filetype=cpp
+endif
+setlocal foldcolumn=0
+setlocal foldenable
+setlocal foldexpr=0
+setlocal foldignore=#
+setlocal foldlevel=0
+setlocal foldmarker={{{,}}}
+set foldmethod=syntax
+setlocal foldmethod=syntax
+setlocal foldminlines=1
+setlocal foldnestmax=20
+setlocal foldtext=foldtext()
+setlocal formatexpr=
+setlocal formatoptions=croql
+setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
+setlocal grepprg=
+setlocal iminsert=0
+setlocal imsearch=0
+setlocal include=
+setlocal includeexpr=
+setlocal indentexpr=
+setlocal indentkeys=0{,0},:,0#,!^F,o,O,e
+setlocal noinfercase
+setlocal iskeyword=@,48-57,_,192-255
+setlocal keywordprg=
+setlocal nolinebreak
+setlocal nolisp
+setlocal lispwords=
+setlocal nolist
+setlocal makeprg=
+setlocal matchpairs=(:),{:},[:]
+setlocal modeline
+setlocal modifiable
+setlocal nrformats=octal,hex
+set number
+setlocal number
+setlocal numberwidth=4
+setlocal omnifunc=youcompleteme#OmniComplete
+setlocal path=
+setlocal nopreserveindent
+setlocal nopreviewwindow
+setlocal quoteescape=\\
+setlocal noreadonly
+set relativenumber
+setlocal relativenumber
+setlocal norightleft
+setlocal rightleftcmd=search
+setlocal noscrollbind
+setlocal shiftwidth=2
+setlocal noshortname
+setlocal smartindent
+setlocal softtabstop=0
+setlocal nospell
+setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
+setlocal spellfile=
+setlocal spelllang=en
+setlocal statusline=%!airline#statusline(1)
+setlocal suffixesadd=
+setlocal swapfile
+setlocal synmaxcol=3000
+if &syntax != 'cpp'
+setlocal syntax=cpp
+endif
+setlocal tabstop=2
+setlocal tags=
+setlocal textwidth=0
+setlocal thesaurus=
+setlocal noundofile
+setlocal undolevels=-123456
+setlocal nowinfixheight
+setlocal nowinfixwidth
+setlocal wrap
+setlocal wrapmargin=0
+40
+normal! zo
+190
+normal! zo
+191
+normal! zo
+196
+normal! zo
+201
+normal! zo
+228
+normal! zo
+257
+normal! zo
+284
+normal! zo
+299
+normal! zo
+318
+normal! zo
+324
+normal! zo
+334
+normal! zo
+341
+normal! zo
+345
+normal! zo
+346
+normal! zo
+354
+normal! zo
+355
+normal! zo
+362
+normal! zo
+367
+normal! zo
+371
+normal! zo
+385
+normal! zo
+403
+normal! zo
+let s:l = 131 - ((25 * winheight(0) + 32) / 65)
+if s:l < 1 | let s:l = 1 | endif
+exe s:l
+normal! zt
+131
+normal! 060|
 tabedit Assignment4/clothsim.cl
 set splitbelow splitright
 wincmd t
@@ -1009,7 +1140,7 @@ setlocal formatoptions=croql
 setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
 setlocal grepprg=
 setlocal iminsert=0
-setlocal imsearch=2
+setlocal imsearch=0
 setlocal include=
 setlocal includeexpr=
 setlocal indentexpr=
@@ -1044,10 +1175,11 @@ setlocal shiftwidth=2
 setlocal noshortname
 setlocal smartindent
 setlocal softtabstop=0
-setlocal nospell
+set spell
+setlocal spell
 setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
 setlocal spellfile=
-setlocal spelllang=en
+setlocal spelllang=en_us
 setlocal statusline=%!airline#statusline(1)
 setlocal suffixesadd=
 setlocal swapfile
@@ -1065,34 +1197,14 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
-82
+335
 normal! zo
-172
-normal! zo
-184
-normal! zo
-197
-normal! zo
-208
-normal! zo
-209
-normal! zo
-172
-normal! zo
-184
-normal! zo
-197
-normal! zo
-208
-normal! zo
-209
-normal! zo
-let s:l = 91 - ((35 * winheight(0) + 32) / 65)
+let s:l = 383 - ((39 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-91
-normal! 043|
+383
+normal! 058|
 tabnext 7
 if exists('s:wipebuf')
   silent exe 'bwipe ' . s:wipebuf
