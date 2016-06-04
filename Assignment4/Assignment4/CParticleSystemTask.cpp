@@ -76,8 +76,10 @@ CParticleSystemTask::~CParticleSystemTask()
 	ReleaseResources();
 }
 
-bool CParticleSystemTask::InitResources(cl_device_id Device, cl_context Context)
+bool CParticleSystemTask::InitResources(cl_device_id Device, cl_context Context, cl_command_queue CommandQueue)
 {
+  (void) CommandQueue;
+
 	//Load mesh
 	float4x4 M = float4x4(	1.f, 0.f, 0.f, 0.f,
 							0.f, 1.f, 0.f, 0.f,

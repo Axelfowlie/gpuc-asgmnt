@@ -39,7 +39,7 @@ public:
 	virtual ~CClothSimulationTask();
 
 	// IComputeTask
-	virtual bool InitResources(cl_device_id Device, cl_context Context);
+	virtual bool InitResources(cl_device_id Device, cl_context Context, cl_command_queue CommandQueue);
 
 	virtual void ReleaseResources();
 
@@ -90,6 +90,7 @@ protected:
 	cl_mem					m_clPosArrayOld = nullptr;
 	cl_mem					m_clPosArrayAux = nullptr;
 	cl_mem					m_clNormalArray = nullptr;
+	cl_mem					m_clSpringArray = nullptr;
 
 	cl_program				m_ClothSimProgram = nullptr;
 	cl_kernel				m_NormalKernel = nullptr;

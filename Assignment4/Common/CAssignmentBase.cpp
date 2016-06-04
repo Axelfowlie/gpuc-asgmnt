@@ -184,7 +184,7 @@ bool CAssignmentBase::RunComputeTask(IComputeTask& Task, size_t LocalWorkSize[3]
 		std::cerr<<"Error: RunComputeTask() cannot execute because the OpenCL context has not been created first."<<endl;
 	}
 	
-	if(!Task.InitResources(m_CLDevice, m_CLContext))
+	if(!Task.InitResources(m_CLDevice, m_CLContext, m_CLCommandQueue))
 	{
 		std::cerr << "Error during resource allocation. Aborting execution." <<endl;
 		Task.ReleaseResources();

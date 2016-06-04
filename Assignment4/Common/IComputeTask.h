@@ -43,7 +43,7 @@ public:
 	virtual ~IComputeTask() {};
 	
 	//! Init any resources specific to the current task
-	virtual bool InitResources(cl_device_id Device, cl_context Context) = 0;
+	virtual bool InitResources(cl_device_id Device, cl_context Context, cl_command_queue CommandQueue) = 0;
 
 	//! Release everything allocated in InitResources()
 	virtual void ReleaseResources() = 0;

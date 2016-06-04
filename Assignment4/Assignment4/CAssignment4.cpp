@@ -42,7 +42,7 @@ CAssignment4::CAssignment4()
 	// select task here...
 	// This time you have to do it during compile time
 	
-#if 1
+#if 0
 	cout<<"########################################"<<endl;
 	cout<<"TASK 1: Particle System"<<endl<<endl;
 
@@ -82,7 +82,7 @@ bool CAssignment4::EnterMainLoop(int argc, char** argv)
 	if(InitGL(argc, argv) && InitCLContext())
 	{
 		if(m_pCurrentTask)
-			m_pCurrentTask->InitResources(m_CLDevice, m_CLContext);
+			m_pCurrentTask->InitResources(m_CLDevice, m_CLContext, m_CLCommandQueue);
 		
 		// the main event loop...
 		while(!glfwWindowShouldClose(m_Window))
