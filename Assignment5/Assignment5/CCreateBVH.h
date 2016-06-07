@@ -17,8 +17,9 @@
                                 dP                                    d8888P  
 ******************************************************************************/
 
-#ifndef _CPARTICLE_SYSTEM_TASK_H
-#define _CPARTICLE_SYSTEM_TASK_H
+#ifndef CPARTICLESYSTEMTASK_H_80VXUHBT
+#define CPARTICLESYSTEMTASK_H_80VXUHBT
+
 
 #include "../Common/IGUIEnabledComputeTask.h"
 
@@ -33,15 +34,15 @@
 	running on the GPU. The methods related to the evaluation of the correctness of the
 	kernel are therefore meaningless (not implemented).
 */
-class CParticleSystemTask : public IGUIEnabledComputeTask
+class CCreateBVH : public IGUIEnabledComputeTask
 {
 public:
-	CParticleSystemTask(
+	CCreateBVH(
 			const std::string& CollisionMeshPath,
 			unsigned int NParticles,
 			size_t LocalWorkSize[3]);
 
-	virtual ~CParticleSystemTask();
+	virtual ~CCreateBVH();
 
 	// IComputeTask
 	virtual bool InitResources(cl_device_id Device, cl_context Context, cl_command_queue CommandQueue);
@@ -49,6 +50,9 @@ public:
 	virtual void ReleaseResources();
 
 	virtual void ComputeGPU(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3]);
+
+  virtual void TestPerformance(cl_context Context, cl_command_queue CommandQueue);
+
 
 	// Not implemented!
 	virtual void ComputeCPU() {};
@@ -150,4 +154,4 @@ protected:
 
 };
 
-#endif // _CPARTICLE_SYSTEM_TASK_H
+#endif /* end of include guard: CPARTICLESYSTEMTASK_H_80VXUHBT */

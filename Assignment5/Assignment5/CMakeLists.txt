@@ -46,7 +46,7 @@ include_directories(glew/include)
 set(sources
   ParticleSystem.cl
   Scan.cl
-  CParticleSystemTask.cpp
+  CCreateBVH.cpp
   CAssignment5.cpp
   CTriMesh.cpp
   CGLTexture.cpp
@@ -57,7 +57,7 @@ set(sources
   mesh.frag
   meshtextured.frag
   particles.frag
-  CParticleSystemTask.h
+  CCreateBVH.h
   CAssignment5.h
   CTriMesh.h
   CGLTexture.h

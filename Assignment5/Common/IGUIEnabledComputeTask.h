@@ -32,6 +32,8 @@ class IGUIEnabledComputeTask : public IComputeTask
 public:
 	virtual ~IGUIEnabledComputeTask() {};
 
+  virtual void TestPerformance(cl_context Context, cl_command_queue CommandQueue) = 0;
+
 	// OpenGL render callback
 	virtual void Render() = 0;
 
