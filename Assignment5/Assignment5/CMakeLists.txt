@@ -44,7 +44,6 @@ include_directories(glew/include)
 
 # Define source files for this assignment
 set(sources
-  ParticleSystem.cl
   Scan.cl
   CCreateBVH.cpp
   CAssignment5.cpp
@@ -53,10 +52,7 @@ set(sources
   GLCommon.cpp
   main.cpp
   HLSL.cpp
-  forcefield.frag
   mesh.frag
-  meshtextured.frag
-  particles.frag
   CCreateBVH.h
   CAssignment5.h
   CTriMesh.h
@@ -64,10 +60,7 @@ set(sources
   GLCommon.h
   HLSL.h
   HLSLEx.h
-  forcefield.vert
   mesh.vert
-  meshtextured.vert
-  particles.vert
   )
 ADD_EXECUTABLE (Assignment 
 	${sources}

@@ -20,6 +20,9 @@ GPU Computing / GPGPU Praktikum source code.
 #endif
 
 
+//#define BUILD_PERF_TEST
+
+
 using namespace std;
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -34,23 +37,22 @@ CAssignment5* CAssignment5::GetSingleton() {
 }
 
 CAssignment5::CAssignment5() : m_Window(nullptr), m_WindowWidth(1024), m_WindowHeight(768), m_PrevTime(-1.0) {
-// select task here...
-// This time you have to do it during compile time
+  // select task here...
+  // This time you have to do it during compile time
 
-#if 1
   cout << "########################################" << endl;
-  cout << "TASK 1: Particle System" << endl
+  cout << "Fully parallel BVH construction" << endl
        << endl;
 
-  std::string meshPath = "Assets/cubeJump.obj";
+  std::string meshPath = "Assets/cubeMonkey.obj";
   // Uncomment this to test your application with more triangles!
   // meshPath = "Assets/cubeMonkey.obj";
 
   m_LocalWorkSize[0] = 192;
   m_LocalWorkSize[1] = 1;
   m_LocalWorkSize[2] = 1;
-  m_pCurrentTask = new CCreateBVH(meshPath, 1024 * 192, m_LocalWorkSize);
-#endif
+  m_pCurrentTask = new CCreateBVH(meshPath, 1024 * 192, 512, m_LocalWorkSize);
+  //m_pCurrentTask = new CCreateBVH(meshPath, 100000, 512, m_LocalWorkSize);
 }
 
 CAssignment5::~CAssignment5() {
@@ -66,9 +68,9 @@ bool CAssignment5::EnterMainLoop(int argc, char** argv) {
     if (m_pCurrentTask) m_pCurrentTask->InitResources(m_CLDevice, m_CLContext, m_CLCommandQueue);
 
 
-#if 1
+#ifdef BUILD_PERF_TEST 
     if (m_pCurrentTask) m_pCurrentTask->TestPerformance(m_CLContext, m_CLCommandQueue);
-#endif
+#else
 
     // the main event loop...
     while (!glfwWindowShouldClose(m_Window)) {
@@ -77,6 +79,7 @@ bool CAssignment5::EnterMainLoop(int argc, char** argv) {
 
       glfwPollEvents();
     }
+#endif
 
     if (m_pCurrentTask) m_pCurrentTask->ReleaseResources();
   } else {

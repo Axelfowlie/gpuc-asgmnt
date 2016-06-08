@@ -1,5 +1,4 @@
 #extension GL_EXT_gpu_shader4 : enable
-uniform samplerBuffer tboSampler;
 
 vec4 colorCode(float value)
 {
@@ -19,14 +18,12 @@ vec4 colorCode(float value)
 void main() {
 	vec4 v = vec4(gl_Vertex);
 	 
-	vec3 speed = texelFetchBuffer(tboSampler, gl_VertexID).xyz;		
 
 	if (v.w < 1.f)
 		gl_FrontColor = colorCode(v.w);
 	else
 		gl_FrontColor = vec4(0.3, 0.01, 0.01, 0.1);
 
-	//gl_FrontColor = colorCode(length(speed));
 
 
 	//if (v.w <= 0.f)
