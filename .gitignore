@@ -29,6 +29,7 @@
 
 # build folder
 *.build
+build
 
 *.swp
 *.xmp
