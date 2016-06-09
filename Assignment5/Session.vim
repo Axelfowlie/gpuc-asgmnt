@@ -148,7 +148,7 @@ set fileencodings=ucs-bom,utf-8,default,latin1
 set guifont=Droid\ Sans\ Mono\ 10
 set guioptions=agimt
 set helplang=en
-set hlsearch
+set iminsert=0
 set laststatus=2
 set mouse=a
 set omnifunc=youcompleteme#OmniComplete
@@ -184,11 +184,11 @@ badd +1 Assignment5/CParticleSystemTask.h
 badd +1 Assignment5/CParticleSystemTask.cpp
 badd +1 Assignment5/CCreateBVH.h
 badd +1 Assignment5/CCreateBVH.cpp
-badd +0 Assignment5/Scan.cl
+badd +1 Assignment5/Scan.cl
 badd +1 Common/CommonDefs.h
 badd +61 Assignment5/GLCommon.h
 badd +47 Assignment5/GLCommon.cpp
-badd +0 Common/CLUtil.cpp
+badd +1 Common/CLUtil.cpp
 badd +1 Assignment5/RadixSort.cl
 badd +27 Assignment5/particles.vert
 argglobal
@@ -315,8 +315,6 @@ normal! zo
 normal! zo
 76
 normal! zo
-83
-normal! zo
 95
 normal! zo
 102
@@ -361,12 +359,12 @@ normal! zo
 normal! zo
 314
 normal! zo
-let s:l = 47 - ((35 * winheight(0) + 32) / 65)
+let s:l = 55 - ((43 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-47
-normal! 043|
+55
+normal! 053|
 tabedit Assignment5/CCreateBVH.h
 set splitbelow splitright
 wincmd t
@@ -485,12 +483,12 @@ setlocal wrapmargin=0
 normal! zo
 60
 normal! zo
-let s:l = 105 - ((27 * winheight(0) + 32) / 65)
+let s:l = 55 - ((30 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-105
-normal! 0
+55
+normal! 081|
 tabedit Assignment5/CCreateBVH.cpp
 set splitbelow splitright
 wincmd t
@@ -606,30 +604,18 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
-73
+272
 normal! zo
-83
+362
 normal! zo
-126
-normal! zo
-133
-normal! zo
-137
-normal! zo
-149
-normal! zo
-126
+362
 normal! zc
-210
-normal! zo
-210
-normal! zc
-let s:l = 80 - ((49 * winheight(0) + 32) / 65)
+let s:l = 359 - ((47 * winheight(0) + 32) / 65)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-80
-normal! 04|
+359
+normal! 02|
 tabedit Assignment5/Scan.cl
 set splitbelow splitright
 wincmd t
@@ -723,6 +709,7 @@ setlocal shiftwidth=2
 setlocal noshortname
 setlocal smartindent
 setlocal softtabstop=0
+set spell
 setlocal nospell
 setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
 setlocal spellfile=
@@ -753,7 +740,7 @@ if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
 84
-normal! 01|
+normal! 0
 tabedit Assignment5/RadixSort.cl
 set splitbelow splitright
 wincmd t
@@ -847,6 +834,7 @@ setlocal shiftwidth=2
 setlocal noshortname
 setlocal smartindent
 setlocal softtabstop=0
+set spell
 setlocal nospell
 setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
 setlocal spellfile=

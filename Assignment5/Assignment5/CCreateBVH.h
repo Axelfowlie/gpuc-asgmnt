@@ -52,7 +52,7 @@ public:
   virtual void TestPerformance(cl_context Context, cl_command_queue CommandQueue);
 
 
-  void Scan(cl_context Context, cl_command_queue CommandQueue);
+  void Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem inoutbuffer);
 
 
   // Not implemented!
@@ -88,6 +88,20 @@ protected:
   cl_program m_ScanProgram = nullptr;
   cl_kernel m_ScanKernel = nullptr;
   cl_kernel m_ScanAddKernel = nullptr;
+
+  // RADIX SORT
+  // Buffers to hold the flabs for the current radix
+  cl_mem m_clRadixZeroBit = nullptr;
+  cl_mem m_clRadixOneBit = nullptr;
+
+
+  //
+  //
+  //
+  //
+  //
+  //
+  //
 
 
 

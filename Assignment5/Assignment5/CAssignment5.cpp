@@ -20,7 +20,7 @@ GPU Computing / GPGPU Praktikum source code.
 #endif
 
 
-//#define BUILD_PERF_TEST
+#define BUILD_PERF_TEST
 
 
 using namespace std;
@@ -51,8 +51,8 @@ CAssignment5::CAssignment5() : m_Window(nullptr), m_WindowWidth(1024), m_WindowH
   m_LocalWorkSize[0] = 192;
   m_LocalWorkSize[1] = 1;
   m_LocalWorkSize[2] = 1;
-  m_pCurrentTask = new CCreateBVH(meshPath, 1024 * 192, 512, m_LocalWorkSize);
-  //m_pCurrentTask = new CCreateBVH(meshPath, 100000, 512, m_LocalWorkSize);
+  //m_pCurrentTask = new CCreateBVH(meshPath, 1024 * 192, 512, m_LocalWorkSize);
+  m_pCurrentTask = new CCreateBVH(meshPath, 100000, 512, m_LocalWorkSize);
 }
 
 CAssignment5::~CAssignment5() {

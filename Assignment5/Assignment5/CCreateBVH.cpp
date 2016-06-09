@@ -80,10 +80,16 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   cl_int clError;
 
   // Levels for radix sort scan
-  for (auto& level : m_clScanLevels) {
-    level.first = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * level.second, NULL, &clError);
+  // Do not create a buffer for the first level, since we will create separate buffers as inputs
+  for (size_t l = 1; l < m_clScanLevels.size(); ++l) {
+    m_clScanLevels[l].first = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[l].second, NULL, &clError);
     V_RETURN_FALSE_CL(clError, "Error allocating device arrays");
   }
+
+  // Radix bit buffers
+  // Buffers that holds the flags where the bit of the current radix is zero/one
+  m_clRadixZeroBit = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+  m_clRadixOneBit = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
 
 
   //
@@ -326,30 +332,40 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
   // Time for GPU
-  V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clScanLevels[0].first, CL_FALSE, 0, m_nElements * sizeof(cl_uint), initkeys.data(), 0, NULL, NULL),
+  V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clRadixZeroBit, CL_FALSE, 0, m_nElements * sizeof(cl_uint), initkeys.data(), 0, NULL, NULL),
               "Error writing random keys to cl memory!");
 
   timer.Start();
-  for (size_t i = 0; i < 100; ++i) Scan(Context, CommandQueue);
+  for (size_t i = 0; i < 100; ++i) Scan(Context, CommandQueue, m_clRadixZeroBit);
   clFinish(CommandQueue);
   timer.Stop();
   timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
 
   // Validate correctnes
-  V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clScanLevels[0].first, CL_FALSE, 0, m_nElements * sizeof(cl_uint), initkeys.data(), 0, NULL, NULL),
+  V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clRadixZeroBit, CL_FALSE, 0, m_nElements * sizeof(cl_uint), initkeys.data(), 0, NULL, NULL),
               "Error writing random keys to cl memory!");
-  Scan(Context, CommandQueue);
-  V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clScanLevels[0].first, CL_TRUE, 0, m_nElements * sizeof(cl_uint), resultkeys.data(), 0, NULL, NULL),
+  Scan(Context, CommandQueue, m_clRadixZeroBit);
+  V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), resultkeys.data(), 0, NULL, NULL),
               "Error reading data from device!");
 
   print_info("SCAN", timecpu, timegpu, memcmp(resultkeys.data(), resultkeys_cpu.data(), resultkeys.size() * sizeof(cl_uint)) == 0);
+
+
+
+  // #############
+  // RADIX FLAGS
+  // #############
+  
 }
 
-void CCreateBVH::Scan(cl_context Context, cl_command_queue CommandQueue) {
+void CCreateBVH::Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem inoutbuffer) {
   cl_int clErr;
   size_t globalWorkSize;
   size_t localMemSize = sizeof(cl_uint) * (m_ScanLocalWorkSize[0] * 2 + m_ScanLocalWorkSize[0] / NUM_BANKS);
+
+  // Set the input as level zero
+  m_clScanLevels[0].first = inoutbuffer;
 
   // Loop to compute the local PPS
   for (size_t level = 0; level < m_clScanLevels.size() - 1; ++level) {
@@ -379,6 +395,9 @@ void CCreateBVH::Scan(cl_context Context, cl_command_queue CommandQueue) {
     clErr = clEnqueueNDRangeKernel(CommandQueue, m_ScanAddKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
     V_RETURN_CL(clErr, "Error when enqueuing kernel.");
   }
+
+  // Results are in the input buffer again, clean up so that no weird thing happen...
+  m_clScanLevels[0].first = nullptr;
 }
 
 
