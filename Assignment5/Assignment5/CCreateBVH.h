@@ -53,6 +53,7 @@ public:
 
 
   void Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem inoutbuffer);
+  void SelectBitflag(cl_context Context, cl_command_queue CommandQueue, cl_mem flagnotset, cl_mem flagset, cl_mem keys, cl_uint mask);
 
 
   // Not implemented!
@@ -93,6 +94,10 @@ protected:
   // Buffers to hold the flabs for the current radix
   cl_mem m_clRadixZeroBit = nullptr;
   cl_mem m_clRadixOneBit = nullptr;
+  cl_mem m_clMortonCodes = nullptr;
+
+  cl_program m_RadixSortProgram = nullptr;
+  cl_kernel m_SelectBitflagKernel = nullptr;
 
 
   //

@@ -78,6 +78,8 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
 
 
   cl_int clError;
+  string programCode;
+
 
   // Levels for radix sort scan
   // Do not create a buffer for the first level, since we will create separate buffers as inputs
@@ -86,10 +88,33 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
     V_RETURN_FALSE_CL(clError, "Error allocating device arrays");
   }
 
+  // Scan kernels
+  CLUtil::LoadProgramSourceToMemory("Scan.cl", programCode);
+  m_ScanProgram = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
+  if (!m_ScanProgram) return false;
+
+  m_ScanKernel = clCreateKernel(m_ScanProgram, "Scan", &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create Scan kernel.");
+  m_ScanAddKernel = clCreateKernel(m_ScanProgram, "ScanAdd", &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create ScanAdd kernel.");
+
+
+
   // Radix bit buffers
   // Buffers that holds the flags where the bit of the current radix is zero/one
   m_clRadixZeroBit = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   m_clRadixOneBit = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+  // Morton code for each bounding volume
+  m_clMortonCodes = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+
+
+  // Sort kernels
+  CLUtil::LoadProgramSourceToMemory("RadixSort.cl", programCode);
+  m_RadixSortProgram = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
+  if (!m_ScanProgram) return false;
+
+  m_SelectBitflagKernel = clCreateKernel(m_RadixSortProgram, "SelectBitflag", &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create SelectBitflag kernel.");
 
 
   //
@@ -112,8 +137,6 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   clError |= clError2;
 
 
-  // Kernel programs
-  string programCode;
 
   // Scan kernels
   CLUtil::LoadProgramSourceToMemory("Scan.cl", programCode);
@@ -253,17 +276,17 @@ void CCreateBVH::ComputeGPU(cl_context Context, cl_command_queue CommandQueue, s
 
   glFinish();
   V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clPosLife[0], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
-//  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clVelMass[0], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  //  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clVelMass[0], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
   V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clPosLife[1], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
-//  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clVelMass[1], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  //  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clVelMass[1], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
 
   // DO THE CL STUFF HERE
 
 
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clPosLife[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
-//  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clVelMass[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  //  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clVelMass[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clPosLife[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
-//  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clVelMass[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  //  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clVelMass[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
 
   clFinish(CommandQueue);
 }
@@ -311,52 +334,97 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   CTimer timer;
   double timecpu, timegpu;
 
-
-  // #############
-  // SCAN
-  // #############
-  std::vector<cl_uint> initkeys(m_nElements);
-  std::vector<cl_uint> resultkeys(m_nElements);
-  std::vector<cl_uint> resultkeys_cpu(m_nElements);
-  for (auto& k : initkeys) k = rand() & 15;
-
-  // Time for CPU
-  timer.Start();
-  size_t sum = 0;
-  for (size_t i = 0; i < m_nElements; ++i) {
-    resultkeys_cpu[i] = sum;
-    sum += initkeys[i];
-  }
-  timer.Stop();
-  timecpu = timer.GetElapsedMilliseconds();
-
-
-  // Time for GPU
-  V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clRadixZeroBit, CL_FALSE, 0, m_nElements * sizeof(cl_uint), initkeys.data(), 0, NULL, NULL),
-              "Error writing random keys to cl memory!");
-
-  timer.Start();
-  for (size_t i = 0; i < 100; ++i) Scan(Context, CommandQueue, m_clRadixZeroBit);
-  clFinish(CommandQueue);
-  timer.Stop();
-  timegpu = timer.GetElapsedMilliseconds() / 100.0;
-
-
-  // Validate correctnes
-  V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clRadixZeroBit, CL_FALSE, 0, m_nElements * sizeof(cl_uint), initkeys.data(), 0, NULL, NULL),
-              "Error writing random keys to cl memory!");
-  Scan(Context, CommandQueue, m_clRadixZeroBit);
-  V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), resultkeys.data(), 0, NULL, NULL),
-              "Error reading data from device!");
-
-  print_info("SCAN", timecpu, timegpu, memcmp(resultkeys.data(), resultkeys_cpu.data(), resultkeys.size() * sizeof(cl_uint)) == 0);
-
+  std::vector<cl_uint> mortoncodes(m_nElements);
+  std::vector<cl_uint> zeroflags(m_nElements);
+  std::vector<cl_uint> oneflags(m_nElements);
+  std::vector<cl_uint> zeroflags_cpu(m_nElements);
+  std::vector<cl_uint> oneflags_cpu(m_nElements);
+  for (auto& k : mortoncodes) k = rand() & 1500;
 
 
   // #############
   // RADIX FLAGS
   // #############
-  
+  {
+    // Time for CPU
+    timer.Start();
+    for (size_t i = 0; i < m_nElements; ++i) {
+      cl_uint rzero = 1;
+      cl_uint rone = 0;
+      if ((mortoncodes[i] & 0x0001) == 0x0001) {
+        rzero = 0;
+        rone = 1;
+      }
+      zeroflags_cpu[i] = rzero;
+      oneflags_cpu[i] = rone;
+    }
+    timer.Stop();
+    timecpu = timer.GetElapsedMilliseconds();
+
+    // Time for GPU
+    V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clMortonCodes, CL_FALSE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
+                "Error writing random keys to cl memory!");
+
+    timer.Start();
+    for (size_t i = 0; i < 100; ++i) SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+    clFinish(CommandQueue);
+    timer.Stop();
+    timegpu = timer.GetElapsedMilliseconds() / 100.0;
+
+    // Validate correctness
+    V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clMortonCodes, CL_FALSE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
+                "Error writing random keys to cl memory!");
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), zeroflags.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixOneBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), oneflags.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
+    bool res = memcmp(zeroflags.data(), zeroflags_cpu.data(), zeroflags.size() * sizeof(cl_uint)) == 0 &&
+               memcmp(oneflags.data(), oneflags_cpu.data(), oneflags.size() * sizeof(cl_uint)) == 0;
+    print_info("SELECT BIT", timecpu, timegpu, res);
+
+    //for (size_t i = 0; i < 16; ++i) {
+    //  cout << std::hex << setw(4) << initkeys[i] << "   " << std::hex << setw(4) << result1_cpu[i] << "   " << std::hex << setw(4) << result1[i] << endl;
+    //}
+  }
+
+
+  // #############
+  // SCAN
+  // #############
+  {
+    // Time for CPU
+    timer.Start();
+    size_t sum = 0;
+    for (size_t i = 0; i < m_nElements; ++i) {
+      cl_uint tmp = zeroflags_cpu[i];
+      zeroflags_cpu[i] = sum;
+      sum += tmp;
+    }
+    timer.Stop();
+    timecpu = timer.GetElapsedMilliseconds();
+
+
+    // Time for GPU
+    // Initialize buffers for scan with result from SelectBitflag
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+
+    timer.Start();
+    for (size_t i = 0; i < 100; ++i) Scan(Context, CommandQueue, m_clRadixZeroBit);
+    clFinish(CommandQueue);
+    timer.Stop();
+    timegpu = timer.GetElapsedMilliseconds() / 100.0;
+
+
+    // Validate correctness
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+    Scan(Context, CommandQueue, m_clRadixZeroBit);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), zeroflags.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
+    print_info("SCAN", timecpu, timegpu, memcmp(zeroflags.data(), zeroflags_cpu.data(), zeroflags.size() * sizeof(cl_uint)) == 0);
+  }
 }
 
 void CCreateBVH::Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem inoutbuffer) {
@@ -400,6 +468,21 @@ void CCreateBVH::Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem 
   m_clScanLevels[0].first = nullptr;
 }
 
+void CCreateBVH::SelectBitflag(cl_context Context, cl_command_queue CommandQueue, cl_mem flagnotset, cl_mem flagset, cl_mem keys, cl_uint mask) {
+  cl_int clErr;
+  // We need as many work items as elements
+  size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
+
+  clErr = clSetKernelArg(m_SelectBitflagKernel, 0, sizeof(cl_mem), (void*)&flagnotset);
+  clErr |= clSetKernelArg(m_SelectBitflagKernel, 1, sizeof(cl_mem), (void*)&flagset);
+  clErr |= clSetKernelArg(m_SelectBitflagKernel, 2, sizeof(cl_mem), (void*)&keys);
+  clErr |= clSetKernelArg(m_SelectBitflagKernel, 3, sizeof(cl_uint), (void*)&mask);
+  clErr |= clSetKernelArg(m_SelectBitflagKernel, 4, sizeof(cl_uint), (void*)&m_nElements);
+  V_RETURN_CL(clErr, "Error setting kernel arguments.");
+
+  clErr = clEnqueueNDRangeKernel(CommandQueue, m_SelectBitflagKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
+  V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+}
 
 
 void CCreateBVH::Render() {
@@ -428,8 +511,6 @@ void CCreateBVH::Render() {
   glDepthMask(GL_FALSE);
 
   glUseProgramObjectARB(m_ProgRenderParticles);
-
-
 
 
 
