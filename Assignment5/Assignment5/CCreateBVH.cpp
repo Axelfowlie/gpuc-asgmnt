@@ -81,6 +81,9 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   string programCode;
 
 
+  // ####################
+  //  ### RADIX SORT ###
+  // ####################
   // Levels for radix sort scan
   // Do not create a buffer for the first level, since we will create separate buffers as inputs
   for (size_t l = 1; l < m_clScanLevels.size(); ++l) {
@@ -100,12 +103,15 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
 
 
 
+  // Morton code for each bounding volume
+  m_clMortonCodes[0] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+  m_clMortonCodes[1] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+  m_clSortPermutation[0] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+  m_clSortPermutation[1] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   // Radix bit buffers
   // Buffers that holds the flags where the bit of the current radix is zero/one
   m_clRadixZeroBit = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   m_clRadixOneBit = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
-  // Morton code for each bounding volume
-  m_clMortonCodes = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
 
 
   // Sort kernels
@@ -115,6 +121,11 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
 
   m_SelectBitflagKernel = clCreateKernel(m_RadixSortProgram, "SelectBitflag", &clError);
   V_RETURN_FALSE_CL(clError, "Failed to create SelectBitflag kernel.");
+  m_ReorderKeysKernel = clCreateKernel(m_RadixSortProgram, "ReorderKeys", &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create ReorderKeys kernel.");
+  m_PermutationIdentityKernel = clCreateKernel(m_RadixSortProgram, "PermutationIdentity", &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create PermutationIdentity kernel.");
+
 
 
   //
@@ -333,13 +344,46 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
   CTimer timer;
   double timecpu, timegpu;
+  bool res = true;
 
   std::vector<cl_uint> mortoncodes(m_nElements);
   std::vector<cl_uint> zeroflags(m_nElements);
   std::vector<cl_uint> oneflags(m_nElements);
   std::vector<cl_uint> zeroflags_cpu(m_nElements);
   std::vector<cl_uint> oneflags_cpu(m_nElements);
-  for (auto& k : mortoncodes) k = rand() & 1500;
+  std::vector<cl_uint> mortoncodessort(m_nElements);
+  std::vector<cl_uint> mortoncodessort_cpu(m_nElements);
+  std::vector<cl_uint> permutation(m_nElements);
+  std::vector<cl_uint> permutation_cpu(m_nElements);
+
+  for (auto& c : mortoncodes) c = rand() & 0x00FF;
+
+
+  // #############
+  // PERMUTATION IDENTITY
+  // #############
+  {
+    // Time for CPU
+    timer.Start();
+    for (size_t i = 0; i < m_nElements; ++i) permutation_cpu[i] = i;
+    timer.Stop();
+    timecpu = timer.GetElapsedMilliseconds();
+
+    // Time for GPU
+    timer.Start();
+    for (size_t i = 0; i < 100; ++i) PermutationIdentity(Context, CommandQueue, m_clSortPermutation[0]);
+    clFinish(CommandQueue);
+    timer.Stop();
+    timegpu = timer.GetElapsedMilliseconds() / 100.0;
+
+    // Validate correctness
+    PermutationIdentity(Context, CommandQueue, m_clSortPermutation[0]);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation[0], CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
+    res = memcmp(permutation.data(), permutation_cpu.data(), permutation.size() * sizeof(cl_uint)) == 0;
+    print_info("PERMUTATION IDENTITY", timecpu, timegpu, res);
+  }
 
 
   // #############
@@ -362,29 +406,29 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     timecpu = timer.GetElapsedMilliseconds();
 
     // Time for GPU
-    V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clMortonCodes, CL_FALSE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
+    V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clMortonCodes[0], CL_FALSE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
                 "Error writing random keys to cl memory!");
 
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+    for (size_t i = 0; i < 100; ++i) SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
     // Validate correctness
-    V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clMortonCodes, CL_FALSE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
+    V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clMortonCodes[0], CL_FALSE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
                 "Error writing random keys to cl memory!");
-    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), zeroflags.data(), 0, NULL, NULL),
                 "Error reading data from device!");
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixOneBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), oneflags.data(), 0, NULL, NULL),
                 "Error reading data from device!");
 
-    bool res = memcmp(zeroflags.data(), zeroflags_cpu.data(), zeroflags.size() * sizeof(cl_uint)) == 0 &&
-               memcmp(oneflags.data(), oneflags_cpu.data(), oneflags.size() * sizeof(cl_uint)) == 0;
+    res = memcmp(zeroflags.data(), zeroflags_cpu.data(), zeroflags.size() * sizeof(cl_uint)) == 0 &&
+          memcmp(oneflags.data(), oneflags_cpu.data(), oneflags.size() * sizeof(cl_uint)) == 0;
     print_info("SELECT BIT", timecpu, timegpu, res);
 
-    //for (size_t i = 0; i < 16; ++i) {
+    // for (size_t i = 0; i < 16; ++i) {
     //  cout << std::hex << setw(4) << initkeys[i] << "   " << std::hex << setw(4) << result1_cpu[i] << "   " << std::hex << setw(4) << result1[i] << endl;
     //}
   }
@@ -393,7 +437,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // #############
   // SCAN
   // #############
-  {
+  if (res) {
     // Time for CPU
     timer.Start();
     size_t sum = 0;
@@ -408,7 +452,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Time for GPU
     // Initialize buffers for scan with result from SelectBitflag
-    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
 
     timer.Start();
     for (size_t i = 0; i < 100; ++i) Scan(Context, CommandQueue, m_clRadixZeroBit);
@@ -418,15 +462,158 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
     // Validate correctness
-    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
     Scan(Context, CommandQueue, m_clRadixZeroBit);
+    Scan(Context, CommandQueue, m_clRadixOneBit);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), zeroflags.data(), 0, NULL, NULL),
                 "Error reading data from device!");
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixOneBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), oneflags.data(), 0, NULL, NULL),
+                "Error reading data from device!");
 
-    print_info("SCAN", timecpu, timegpu, memcmp(zeroflags.data(), zeroflags_cpu.data(), zeroflags.size() * sizeof(cl_uint)) == 0);
+    // Assert the prefix sum is correct
+    res = memcmp(zeroflags.data(), zeroflags_cpu.data(), zeroflags.size() * sizeof(cl_uint)) == 0;
+    // Assert the two perfix sums index the new permutation from 0 to m_nElements-1
+    std::vector<bool> seen(m_nElements, false);
+    for (size_t i = 0; i < m_nElements; ++i) {
+      cl_uint idx;
+      if ((mortoncodes[i] & 0x0001) == 0x0001) {
+        idx = zeroflags[m_nElements - 1] + oneflags[i];
+        if ((mortoncodes[m_nElements - 1] & 0x0001) == 0) ++idx;
+      } else {
+        idx = zeroflags[i];
+      }
+
+      res = (idx >= 0 && idx < m_nElements && !seen[idx]);
+      seen[idx] = true;
+      if (!res) break;
+    }
+
+    print_info("SCAN", timecpu, timegpu, res);
+  }
+
+
+  // #############
+  // REORDER
+  // #############
+  if (res) {
+    // Time for CPU
+    // zeroflags and oneflags contains the correct result, that has been calculated in test for SCAN from the GPU
+    // permutation contains the correct result, that has been calculated in test for PERMUTATION IDENTITY from the GPU
+    timer.Start();
+    for (size_t i = 0; i < m_nElements; ++i) {
+      cl_uint idx;
+      if ((mortoncodes[i] & 0x0001) == 0x0001) {
+        idx = zeroflags[m_nElements - 1] + oneflags[i];
+        if ((mortoncodes[m_nElements - 1] & 0x0001) == 0) ++idx;
+      } else {
+        idx = zeroflags[i];
+      }
+
+      mortoncodessort_cpu[idx] = mortoncodes[i];
+      permutation_cpu[idx] = permutation[i];
+    }
+    timer.Stop();
+    timecpu = timer.GetElapsedMilliseconds();
+
+
+    // Time for GPU
+    // Initialize buffers for scan with result from SelectBitflag
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
+    timer.Start();
+    for (size_t i = 0; i < 100; ++i)
+      ReorderKeys(Context, CommandQueue, m_clMortonCodes[1], m_clSortPermutation[1], m_clMortonCodes[0], m_clSortPermutation[0], m_clRadixZeroBit,
+                  m_clRadixOneBit, 0x0001);
+    clFinish(CommandQueue);
+    timer.Stop();
+    timegpu = timer.GetElapsedMilliseconds() / 100.0;
+
+
+    // Validate correctness
+    PermutationIdentity(Context, CommandQueue, m_clSortPermutation[0]);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
+    Scan(Context, CommandQueue, m_clRadixZeroBit);
+    Scan(Context, CommandQueue, m_clRadixOneBit);
+    ReorderKeys(Context, CommandQueue, m_clMortonCodes[1], m_clSortPermutation[1], m_clMortonCodes[0], m_clSortPermutation[0], m_clRadixZeroBit,
+                m_clRadixOneBit, 0x0001);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes[1], CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodessort.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation[1], CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
+
+    // ASSERT that morton codes and permutation are correct,
+    res = memcmp(mortoncodessort.data(), mortoncodessort_cpu.data(), mortoncodessort.size() * sizeof(cl_uint)) == 0 &&
+          memcmp(permutation.data(), permutation_cpu.data(), permutation.size() * sizeof(cl_uint)) == 0;
+    // ASSERT that the permutation permutes to the actual reorderd morton codes.
+    for (size_t i = 0; i < m_nElements; ++i) {
+      res = mortoncodessort[i] == mortoncodes[permutation[i]];
+      if (!res) break;
+    }
+
+    print_info("REORDER", timecpu, timegpu, res);
+  }
+
+
+  // #############
+  // RADIX SORT
+  // #############
+  {
+    for (size_t i = 0; i < m_nElements; ++i) mortoncodessort_cpu[i] = mortoncodes[i];
+    timer.Start();
+    sort(mortoncodessort_cpu.begin(), mortoncodessort_cpu.end());
+    timer.Stop();
+    timecpu = timer.GetElapsedMilliseconds();
+
+    timer.Start();
+    RadixSort(Context, CommandQueue);
+    clFinish(CommandQueue);
+    timer.Stop();
+    timegpu = timer.GetElapsedMilliseconds();
+
+
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes[0], CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodessort.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation[0], CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
+    // ASSERT that morton codes and permutation are correct,
+    res = memcmp(mortoncodessort.data(), mortoncodessort_cpu.data(), mortoncodessort.size() * sizeof(cl_uint)) == 0;
+    // ASSERT that the permutation permutes to the actual reorderd morton codes.
+    for (size_t i = 0; i < m_nElements; ++i) {
+      res = mortoncodessort[i] == mortoncodes[permutation[i]];
+      if (!res) break;
+    }
+
+    print_info("RADIX SORT", timecpu, timegpu, res);
   }
 }
 
+void CCreateBVH::PermutationIdentity(cl_context Context, cl_command_queue CommandQueue, cl_mem permutation) {
+  cl_int clErr;
+  // We need as many work items as elements
+  size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
+
+  clErr = clSetKernelArg(m_PermutationIdentityKernel, 0, sizeof(cl_mem), (void*)&permutation);
+  V_RETURN_CL(clErr, "Error setting kernel arguments.");
+
+  clErr = clEnqueueNDRangeKernel(CommandQueue, m_PermutationIdentityKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
+  V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+}
+void CCreateBVH::SelectBitflag(cl_context Context, cl_command_queue CommandQueue, cl_mem flagnotset, cl_mem flagset, cl_mem keys, cl_uint mask) {
+  cl_int clErr;
+  // We need as many work items as elements
+  size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
+
+  clErr = clSetKernelArg(m_SelectBitflagKernel, 0, sizeof(cl_mem), (void*)&flagnotset);
+  clErr |= clSetKernelArg(m_SelectBitflagKernel, 1, sizeof(cl_mem), (void*)&flagset);
+  clErr |= clSetKernelArg(m_SelectBitflagKernel, 2, sizeof(cl_mem), (void*)&keys);
+  clErr |= clSetKernelArg(m_SelectBitflagKernel, 3, sizeof(cl_uint), (void*)&mask);
+  clErr |= clSetKernelArg(m_SelectBitflagKernel, 4, sizeof(cl_uint), (void*)&m_nElements);
+  V_RETURN_CL(clErr, "Error setting kernel arguments.");
+
+  clErr = clEnqueueNDRangeKernel(CommandQueue, m_SelectBitflagKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
+  V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+}
 void CCreateBVH::Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem inoutbuffer) {
   cl_int clErr;
   size_t globalWorkSize;
@@ -467,21 +654,46 @@ void CCreateBVH::Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem 
   // Results are in the input buffer again, clean up so that no weird thing happen...
   m_clScanLevels[0].first = nullptr;
 }
-
-void CCreateBVH::SelectBitflag(cl_context Context, cl_command_queue CommandQueue, cl_mem flagnotset, cl_mem flagset, cl_mem keys, cl_uint mask) {
+void CCreateBVH::ReorderKeys(cl_context Context, cl_command_queue CommandQueue, cl_mem keysout, cl_mem permutationout, cl_mem keysin, cl_mem permutationin,
+                             cl_mem indexzerobits, cl_mem indexonebits, cl_uint mask) {
   cl_int clErr;
   // We need as many work items as elements
   size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
 
-  clErr = clSetKernelArg(m_SelectBitflagKernel, 0, sizeof(cl_mem), (void*)&flagnotset);
-  clErr |= clSetKernelArg(m_SelectBitflagKernel, 1, sizeof(cl_mem), (void*)&flagset);
-  clErr |= clSetKernelArg(m_SelectBitflagKernel, 2, sizeof(cl_mem), (void*)&keys);
-  clErr |= clSetKernelArg(m_SelectBitflagKernel, 3, sizeof(cl_uint), (void*)&mask);
-  clErr |= clSetKernelArg(m_SelectBitflagKernel, 4, sizeof(cl_uint), (void*)&m_nElements);
+  clErr = clSetKernelArg(m_ReorderKeysKernel, 0, sizeof(cl_mem), (void*)&keysout);
+  clErr |= clSetKernelArg(m_ReorderKeysKernel, 1, sizeof(cl_mem), (void*)&permutationout);
+  clErr |= clSetKernelArg(m_ReorderKeysKernel, 2, sizeof(cl_mem), (void*)&keysin);
+  clErr |= clSetKernelArg(m_ReorderKeysKernel, 3, sizeof(cl_mem), (void*)&permutationin);
+  clErr |= clSetKernelArg(m_ReorderKeysKernel, 4, sizeof(cl_mem), (void*)&indexzerobits);
+  clErr |= clSetKernelArg(m_ReorderKeysKernel, 5, sizeof(cl_mem), (void*)&indexonebits);
+  clErr |= clSetKernelArg(m_ReorderKeysKernel, 6, sizeof(cl_uint), (void*)&mask);
+  clErr |= clSetKernelArg(m_ReorderKeysKernel, 7, sizeof(cl_uint), (void*)&m_nElements);
   V_RETURN_CL(clErr, "Error setting kernel arguments.");
 
-  clErr = clEnqueueNDRangeKernel(CommandQueue, m_SelectBitflagKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
+  clErr = clEnqueueNDRangeKernel(CommandQueue, m_ReorderKeysKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+}
+void CCreateBVH::RadixSort(cl_context Context, cl_command_queue CommandQueue) {
+  // Initialize the first source permutation to the ascending numbers from 0 to m_nElements
+  PermutationIdentity(Context, CommandQueue, m_clSortPermutation[0]);
+
+  // For each bit stable sort
+  for (size_t i = 0; i < 32; ++i) {
+    // Start with least important bit
+    cl_uint mask = 1 << i;
+    // Indices for source and destination of ping-pong buffers.
+    int src = i % 2;
+    int dst = (i + 1) % 2;
+
+    // Extract the flags for the current bit.
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[src], mask);
+    // Scan on each buffer of flags
+    Scan(Context, CommandQueue, m_clRadixZeroBit);
+    Scan(Context, CommandQueue, m_clRadixOneBit);
+    // Reorder
+    ReorderKeys(Context, CommandQueue, m_clMortonCodes[dst], m_clSortPermutation[dst], m_clMortonCodes[src], m_clSortPermutation[src], m_clRadixZeroBit,
+                m_clRadixOneBit, mask);
+  }
 }
 
 

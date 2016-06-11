@@ -30,5 +30,26 @@ __kernel void SelectBitflag(__global uint* flagnotset, __global uint* flagset, c
 
 
 
-__kernel void ReorderKeys(__global uint* keys, __global uint* permutation, const __global uint* indexzerobits, const __global uint* indexonebits, const __global uint* offset) {
+__kernel void ReorderKeys(__global uint* keysOut, __global uint* permutationOut, const __global uint* keysIn, const __global uint* permutationIn,
+                          const __global uint* indexzerobits, const __global uint* indexonebits, uint mask, uint N) {
+  int GID = get_global_id(0);
+
+  if (GID >= N) return;
+
+  uint idx;
+  if ((keysIn[GID] & mask) == mask) {
+    idx = indexzerobits[N - 1] + indexonebits[GID];
+    if ((keysIn[N - 1] & mask) == 0) ++idx;
+  } else {
+    idx = indexzerobits[GID];
+  }
+
+  keysOut[idx] = keysIn[GID];
+  permutationOut[idx] = permutationIn[GID];
+}
+
+
+__kernel void PermutationIdentity(__global uint* permutation) {
+  int GID = get_global_id(0);
+  permutation[GID] = GID;
 }

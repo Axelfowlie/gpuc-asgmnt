@@ -52,8 +52,12 @@ public:
   virtual void TestPerformance(cl_context Context, cl_command_queue CommandQueue);
 
 
-  void Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem inoutbuffer);
+  void PermutationIdentity(cl_context Context, cl_command_queue CommandQueue, cl_mem permutation);
   void SelectBitflag(cl_context Context, cl_command_queue CommandQueue, cl_mem flagnotset, cl_mem flagset, cl_mem keys, cl_uint mask);
+  void Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem inoutbuffer);
+  void ReorderKeys(cl_context Context, cl_command_queue CommandQueue, cl_mem keysout, cl_mem permutationout, cl_mem keysin, cl_mem permutationin,
+                   cl_mem indexzerobits, cl_mem indexonebits, cl_uint mask);
+  void RadixSort(cl_context Context, cl_command_queue CommandQueue);
 
 
   // Not implemented!
@@ -79,25 +83,28 @@ public:
 protected:
   // Number of leaf nodes in the BVH
   size_t m_nElements = 0;
-
-
-  // PARALLEL SCAN FOR RADIX SORT
   size_t m_ScanLocalWorkSize[3];
+
+  // RADIX SORT
+  // Ping-pong buffers for morton codes (= actual sorted keys) and the permutation
+  cl_mem m_clMortonCodes[2] = {nullptr, nullptr};
+  cl_mem m_clSortPermutation[2] = {nullptr, nullptr};
+  // Buffers to hold the flags for the current sorted radix
+  cl_mem m_clRadixZeroBit = nullptr;
+  cl_mem m_clRadixOneBit = nullptr;
+
+  cl_program m_RadixSortProgram = nullptr;
+  cl_kernel m_SelectBitflagKernel = nullptr;
+  cl_kernel m_ReorderKeysKernel = nullptr;
+  cl_kernel m_PermutationIdentityKernel = nullptr;
+  
+  // PARALLEL SCAN FOR RADIX SORT
   // Arrays for each level of the work-efficient scan
   std::vector<std::pair<cl_mem, size_t>> m_clScanLevels;
 
   cl_program m_ScanProgram = nullptr;
   cl_kernel m_ScanKernel = nullptr;
   cl_kernel m_ScanAddKernel = nullptr;
-
-  // RADIX SORT
-  // Buffers to hold the flabs for the current radix
-  cl_mem m_clRadixZeroBit = nullptr;
-  cl_mem m_clRadixOneBit = nullptr;
-  cl_mem m_clMortonCodes = nullptr;
-
-  cl_program m_RadixSortProgram = nullptr;
-  cl_kernel m_SelectBitflagKernel = nullptr;
 
 
   //
