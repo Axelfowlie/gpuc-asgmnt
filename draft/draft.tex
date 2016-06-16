@@ -133,6 +133,24 @@ Another approach is to compute the split points of each inner node in parallel. 
 
 Note, that in the parallel approach each thread has to do more work (3 binary searches instead of one) but the benefit is, we can compute every node's split point and range in parallel and do not have to wait for all nodes further up in the hierarchy to finish.
 
+\paragraph{AABBs of Inner Nodes}
+Finally the AABBs of each inner node needs to be computed as well. Therefore a slightly modified reduction can be used. Hereby the reduction starts with the leaf nodes, and traverses upwards towards the root. To ensure, that each AABB is correct, atomic flags can be used to ensure that an AABB is computed only once for each inner node and only by the second thread that traverses the tree.
+
+\section{Evaluation}
+
+This is only a rough estimation on how much point each task will be worth:
+\begin{itemize}
+  \item Computing Morton codes (2P)
+  \item Sorting (5P)
+  \begin{itemize}
+    \item Calculating flags (1P)
+    \item Scan (1P)
+    \item Reorder (2P)
+    \item Reorder other data structures besides the Morton codes e.g. AABBs of leaf nodes (1P)
+  \end{itemize}
+  \item Inner nodes (4P)
+  \item Inner node AABBs (3P)
+\end{itemize}
 
 \addtolength{\textheight}{-12cm}   % This command serves to balance the column lengths
                                   % on the last page of the document manually. It shortens
