@@ -52,6 +52,12 @@ public:
   virtual void TestPerformance(cl_context Context, cl_command_queue CommandQueue);
 
 
+  void AdvancePositions(cl_context Context, cl_command_queue CommandQueue);
+  void CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue);
+  void ReduceAABB(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs, cl_kernel Kernel);
+  void MortonCodeAABB(cl_context Context, cl_command_queue CommandQueue);
+  void MortonCodes(cl_context Context, cl_command_queue CommandQueue, cl_mem codes, cl_mem positions, cl_mem aabb);
+
   void PermutationIdentity(cl_context Context, cl_command_queue CommandQueue, cl_mem permutation);
   void SelectBitflag(cl_context Context, cl_command_queue CommandQueue, cl_mem flagnotset, cl_mem flagset, cl_mem keys, cl_uint mask);
   void Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem inoutbuffer);
@@ -85,8 +91,38 @@ protected:
   size_t m_nElements = 0;
   size_t m_ScanLocalWorkSize[3];
 
+
+  // BVH data
+  // Center positions and radius of the AABBs + velocity
+  cl_mem m_clPositions = nullptr;
+  cl_mem m_clVelocities = nullptr;
+  // AABBs for leaf and inner nodes
+  // Each one as two float4 arrays, [0] for the minimum and [1] for the maximum
+  cl_mem m_clAABBLeaves[2] = {nullptr, nullptr};
+  cl_mem m_clAABBNodes[2] = {nullptr, nullptr};
+  // Buffer to hold the AABB to calculate the Morton codes
+  cl_mem m_clMortonAABB = nullptr;
+  // AABBs shall be displayed using wireframe boxes
+  GLuint m_glAABBLeafBuf[2] = { 0, 0 };
+  GLuint m_glAABBLeafTB[2] = { 0, 0 };
+  GLuint m_glAABBNodeBuf[2] = { 0, 0 };
+  GLuint m_glAABBNodeTB[2] = { 0, 0 };
+  
+  cl_program m_PrepAABBsProgram = nullptr;
+  cl_kernel m_AdvancePositionsKernel = nullptr;
+  cl_kernel m_CreateLeafAABBsKernel = nullptr;
+
+  cl_program m_MortonCodesProgram = nullptr;
+  cl_kernel m_ReduceAABBminKernel = nullptr;
+  cl_kernel m_ReduceAABBmaxKernel = nullptr;
+  cl_kernel m_MortonCodeAABBKernel = nullptr;
+  cl_kernel m_MortonCodesKernel = nullptr;
+
+
+
   // RADIX SORT
   // Ping-pong buffers for morton codes (= actual sorted keys) and the permutation
+  // Ping-pongin needed in the reorder kernel
   cl_mem m_clMortonCodes[2] = {nullptr, nullptr};
   cl_mem m_clSortPermutation[2] = {nullptr, nullptr};
   // Buffers to hold the flags for the current sorted radix
@@ -117,21 +153,10 @@ protected:
 
 
 
-  unsigned int m_nParticles = 0;
-  unsigned int m_nTriangles = 0;
-
   std::string m_CollisionMeshPath;
 
   CTriMesh* m_pMesh = nullptr;
 
-  // OpenCL memory objects
-  // arrays for particle data
-  cl_mem m_clPosLife[2] /*= { nullptr, nullptr }*/;
-
-
-  // OpenGL variables
-  // these will be used as VBOs
-  GLuint m_glPosLife[2] /*{ 0, 0 }*/;
 
   GLhandleARB m_VSParticles = 0;
   GLhandleARB m_PSParticles = 0;

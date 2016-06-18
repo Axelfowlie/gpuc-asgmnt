@@ -2,10 +2,10 @@ let SessionLoad = 1
 if &cp | set nocp | endif
 let s:cpo_save=&cpo
 set cpo&vim
-inoremap <C-Space> 
-imap <Nul> <C-Space>
-inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
 inoremap <expr> <Down> pumvisible() ? "\" : "\<Down>"
+inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
+imap <Nul> <C-Space>
+inoremap <C-Space> 
 imap <S-Tab> <Plug>SuperTabBackward
 inoremap <silent> <C-Tab> =UltiSnips#ListSnippets()
 map! <S-Insert> <MiddleMouse>
@@ -25,19 +25,19 @@ nnoremap  :tab split
 nnoremap  :tabclose
 nnoremap  :tab split:exec("tag ".expand("<cword>"))
 nnoremap   zz
-onoremap <silent> $ g$
-xnoremap <silent> $ g$
 nnoremap <silent> $ g$
+xnoremap <silent> $ g$
+onoremap <silent> $ g$
 snoremap <silent> $ g$
-xnoremap ,cy "+y
-xnoremap ,cp "+p
-nnoremap ,ct :!ctags -R .
-nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
-nnoremap ,df :call ClangFormatFile()
+nmap ,hu <Plug>GitGutterUndoHunk
 nnoremap ,d :YcmShowDetailedDiagnostic
+nnoremap ,df :call ClangFormatFile()
+nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
+nnoremap ,ct :!ctags -R .
+xnoremap ,cp "+p
+xnoremap ,cy "+y
 nmap ,hp <Plug>GitGutterPreviewHunk
 nmap ,hr <Plug>GitGutterUndoHunk:echomsg ',hr is deprecated. Use ,hu'
-nmap ,hu <Plug>GitGutterUndoHunk
 nmap ,hs <Plug>GitGutterStageHunk
 nnoremap <silent> ,p :CtrlP
 snoremap ,cp "+p
@@ -55,9 +55,9 @@ nnoremap ,gs :tabe %:Gstatus:resize 30
 nnoremap ,o :tabe:CtrlP
 nnoremap ,tl :tabe:Ag TODO
 nnoremap ,ag :tabe:Ag 
-onoremap <silent> 0 g0
-xnoremap <silent> 0 g0
 nnoremap <silent> 0 g0
+xnoremap <silent> 0 g0
+onoremap <silent> 0 g0
 snoremap <silent> 0 g0
 nnoremap G Gzz
 nnoremap <silent> H :wincmd h
@@ -67,58 +67,58 @@ nnoremap <silent> L :wincmd l
 nnoremap N Nzz
 nmap [c <Plug>GitGutterPrevHunk
 nmap ]c <Plug>GitGutterNextHunk
-xmap ac <Plug>GitGutterTextObjectOuterVisual
 omap ac <Plug>GitGutterTextObjectOuterPending
+xmap ac <Plug>GitGutterTextObjectOuterVisual
 xmap gx <Plug>NetrwBrowseXVis
 smap gx <Plug>NetrwBrowseXVis
 nmap gx <Plug>NetrwBrowseX
-xmap ic <Plug>GitGutterTextObjectInnerVisual
 omap ic <Plug>GitGutterTextObjectInnerPending
-onoremap <silent> j gj
-xnoremap <silent> j gj
+xmap ic <Plug>GitGutterTextObjectInnerVisual
 nnoremap <silent> j gj
+xnoremap <silent> j gj
+onoremap <silent> j gj
 snoremap <silent> j gj
-onoremap <silent> k gk
-xnoremap <silent> k gk
 nnoremap <silent> k gk
+xnoremap <silent> k gk
+onoremap <silent> k gk
 snoremap <silent> k gk
 nnoremap n nzz
 nnoremap zL zMzR:call ToggleFoldComments()
 nnoremap zl :call ToggleFoldComments()
-nnoremap <silent> <Plug>GitGutterRevertHunk :GitGutterRevertHunk
-nnoremap <C-Right> :cn
-nnoremap <C-Left> :cp
-nnoremap <C-Down> :ccl
-nnoremap <C-Up> :cw
-map <S-F7> :make clean all -C ./build/
-map <F7> :make -C ./build/
-noremap <F4> :FSHere
-noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
-noremap <silent> <Plug>AirlineSelectPrevTab gT
-noremap <silent> <Plug>AirlineSelectTab9 :9tabn
-noremap <silent> <Plug>AirlineSelectTab8 :8tabn
-noremap <silent> <Plug>AirlineSelectTab7 :7tabn
-noremap <silent> <Plug>AirlineSelectTab6 :6tabn
-noremap <silent> <Plug>AirlineSelectTab5 :5tabn
-noremap <silent> <Plug>AirlineSelectTab4 :4tabn
-noremap <silent> <Plug>AirlineSelectTab3 :3tabn
-noremap <silent> <Plug>AirlineSelectTab2 :2tabn
+nnoremap <SNR>27_: :=v:count ? v:count : ''
+onoremap <silent> <Plug>GitGutterTextObjectInnerPending :call gitgutter#hunk#text_object(1)
+onoremap <silent> <Plug>GitGutterTextObjectOuterPending :call gitgutter#hunk#text_object(0)
+xnoremap <silent> <Plug>GitGutterTextObjectInnerVisual :call gitgutter#hunk#text_object(1)
+xnoremap <silent> <Plug>GitGutterTextObjectOuterVisual :call gitgutter#hunk#text_object(0)
+nnoremap <silent> <Plug>GitGutterUndoHunk :GitGutterUndoHunk
 noremap <silent> <Plug>AirlineSelectTab1 :1tabn
+noremap <silent> <Plug>AirlineSelectTab2 :2tabn
+noremap <silent> <Plug>AirlineSelectTab3 :3tabn
+noremap <silent> <Plug>AirlineSelectTab4 :4tabn
+noremap <silent> <Plug>AirlineSelectTab5 :5tabn
+noremap <silent> <Plug>AirlineSelectTab6 :6tabn
+noremap <silent> <Plug>AirlineSelectTab7 :7tabn
+noremap <silent> <Plug>AirlineSelectTab8 :8tabn
+noremap <silent> <Plug>AirlineSelectTab9 :9tabn
+noremap <silent> <Plug>AirlineSelectPrevTab gT
+noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
+noremap <F4> :FSHere
+map <F7> :make -C ./build/
+map <S-F7> :make clean all -C ./build/
+nnoremap <C-Up> :cw
+nnoremap <C-Down> :ccl
+nnoremap <C-Left> :cp
+nnoremap <C-Right> :cn
 vnoremap <silent> <Plug>NetrwBrowseXVis :call netrw#BrowseXVis()
 nnoremap <silent> <Plug>NetrwBrowseX :call netrw#BrowseX(expand((exists("g:netrw_gx")? g:netrw_gx : '<cfile>')),netrw#CheckIfRemote())
 snoremap <silent> <Del> c
 snoremap <silent> <BS> c
 snoremap <silent> <C-Tab> :call UltiSnips#ListSnippets()
 nnoremap <silent> <Plug>GitGutterPreviewHunk :GitGutterPreviewHunk
-nnoremap <silent> <Plug>GitGutterUndoHunk :GitGutterUndoHunk
+nnoremap <silent> <Plug>GitGutterRevertHunk :GitGutterRevertHunk
 nnoremap <silent> <Plug>GitGutterStageHunk :GitGutterStageHunk
 nnoremap <silent> <expr> <Plug>GitGutterPrevHunk &diff ? '[c' : ":\execute v:count1 . 'GitGutterPrevHunk'\"
 nnoremap <silent> <expr> <Plug>GitGutterNextHunk &diff ? ']c' : ":\execute v:count1 . 'GitGutterNextHunk'\"
-xnoremap <silent> <Plug>GitGutterTextObjectOuterVisual :call gitgutter#hunk#text_object(0)
-xnoremap <silent> <Plug>GitGutterTextObjectInnerVisual :call gitgutter#hunk#text_object(1)
-onoremap <silent> <Plug>GitGutterTextObjectOuterPending :call gitgutter#hunk#text_object(0)
-onoremap <silent> <Plug>GitGutterTextObjectInnerPending :call gitgutter#hunk#text_object(1)
-nnoremap <SNR>27_: :=v:count ? v:count : ''
 nnoremap <silent> <C-PageDown> :wincmd -
 nnoremap <silent> <C-PageUp> :wincmd +
 vnoremap <Right> <Nop>
@@ -190,7 +190,7 @@ set window=60
 let s:so_save = &so | let s:siso_save = &siso | set so=0 siso=0
 let v:this_session=expand("<sfile>:p")
 silent only
-cd /media/hakononakani/Storage/uni/gpuc/gpuc-asgmnt/Assignment5
+cd ~/Documents/studium/GPU\ Praktikum/gpuc-asgmnt/Assignment5
 if expand('%') == '' && !&modified && line('$') <= 1 && getline(1) == ''
   let s:wipebuf = bufnr('%')
 endif
@@ -208,6 +208,9 @@ badd +47 Assignment5/GLCommon.cpp
 badd +1 Common/CLUtil.cpp
 badd +1 Assignment5/RadixSort.cl
 badd +27 Assignment5/particles.vert
+badd +1 Assignment5/CreateLeafAABBs.cl
+badd +1 Assignment5/PrepAABBs.cl
+badd +1 Assignment5/MortonCodes.cl
 argglobal
 silent! argdel *
 edit Assignment5/CAssignment5.cpp
@@ -326,12 +329,16 @@ setlocal wrap
 setlocal wrapmargin=0
 39
 normal! zo
-let s:l = 55 - ((40 * winheight(0) + 32) / 65)
+199
+normal! zo
+199
+normal! zc
+let s:l = 23 - ((22 * winheight(0) + 29) / 58)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-55
-normal! 048|
+23
+normal! 0
 tabedit Assignment5/CCreateBVH.h
 set splitbelow splitright
 wincmd t
@@ -448,14 +455,12 @@ setlocal wrap
 setlocal wrapmargin=0
 37
 normal! zo
-65
-normal! zo
-let s:l = 60 - ((38 * winheight(0) + 32) / 65)
+let s:l = 119 - ((32 * winheight(0) + 29) / 58)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-60
-normal! 068|
+119
+normal! 025|
 tabedit Assignment5/CCreateBVH.cpp
 set splitbelow splitright
 wincmd t
@@ -571,31 +576,13 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
-306
-normal! zo
-307
-normal! zo
-307
-normal! zc
-498
-normal! zo
-498
-normal! zc
-560
-normal! zo
-582
-normal! zo
-676
-normal! zo
-676
-normal! zc
-let s:l = 586 - ((146 * winheight(0) + 32) / 65)
+let s:l = 915 - ((878 * winheight(0) + 29) / 58)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-586
-normal! 0
-tabedit Assignment5/RadixSort.cl
+915
+normal! 01|
+tabedit Assignment5/MortonCodes.cl
 set splitbelow splitright
 wincmd t
 set winheight=1 winwidth=1
@@ -689,7 +676,7 @@ setlocal noshortname
 setlocal smartindent
 setlocal softtabstop=0
 set spell
-setlocal nospell
+setlocal spell
 setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
 setlocal spellfile=
 setlocal spelllang=en_us
@@ -710,23 +697,15 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
-6
+56
 normal! zo
-10
-normal! zo
-21
-normal! zo
-34
-normal! zo
-40
-normal! zo
-let s:l = 54 - ((50 * winheight(0) + 32) / 65)
+let s:l = 56 - ((55 * winheight(0) + 29) / 58)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-54
-normal! 0
-tabnext 3
+56
+normal! 088|
+tabnext 4
 if exists('s:wipebuf')
   silent exe 'bwipe ' . s:wipebuf
 endif

@@ -52,7 +52,7 @@ CAssignment5::CAssignment5() : m_Window(nullptr), m_WindowWidth(1024), m_WindowH
   m_LocalWorkSize[1] = 1;
   m_LocalWorkSize[2] = 1;
   //m_pCurrentTask = new CCreateBVH(meshPath, 1024 * 192, 512, m_LocalWorkSize);
-  m_pCurrentTask = new CCreateBVH(meshPath, 100000, 512, m_LocalWorkSize);
+  m_pCurrentTask = new CCreateBVH(meshPath, 10000, 512, m_LocalWorkSize);
 }
 
 CAssignment5::~CAssignment5() {
@@ -230,7 +230,7 @@ bool CAssignment5::InitGL(int, char**) {
   // projection
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  gluPerspective(60.0, (GLfloat)m_WindowWidth / (GLfloat)m_WindowHeight, 0.1f, 10.0f);
+  gluPerspective(60.0, (GLfloat)m_WindowWidth / (GLfloat)m_WindowHeight, 0.1f, 1000.0f);
 
   // set view matrix
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
