@@ -53,10 +53,11 @@ public:
 
 
   void AdvancePositions(cl_context Context, cl_command_queue CommandQueue, cl_mem positions, cl_mem velocities);
+
   void CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs[2], cl_mem positions);
   void ReduceAABB(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs, cl_kernel Kernel);
   void MortonCodeAABB(cl_context Context, cl_command_queue CommandQueue, cl_mem mortonaabb, cl_mem aabbs[2], cl_mem positions);
-  void MortonCodes(cl_context Context, cl_command_queue CommandQueue, cl_mem codes, cl_mem positions, cl_mem aabb);
+  void MortonCodes(cl_context Context, cl_command_queue CommandQueue, cl_mem codes, cl_mem mortonaabb, cl_mem aabbs[2], cl_mem positions);
 
   void PermutationIdentity(cl_context Context, cl_command_queue CommandQueue, cl_mem permutation);
   void SelectBitflag(cl_context Context, cl_command_queue CommandQueue, cl_mem flagnotset, cl_mem flagset, cl_mem keys, cl_uint mask);
@@ -124,8 +125,8 @@ protected:
   // RADIX SORT
   // Ping-pong buffers for morton codes (= actual sorted keys) and the permutation
   // Ping-pongin needed in the reorder kernel
-  cl_mem m_clMortonCodes[2] = {nullptr, nullptr};
-  cl_mem m_clSortPermutation[2] = {nullptr, nullptr};
+  cl_mem m_clMortonCodes = nullptr;
+  cl_mem m_clSortPermutation = nullptr;
   // Ping-pong buffers for reordering morton codes and permutation
   cl_mem m_clRadixKeysPong = nullptr;
   cl_mem m_clRadixPermutationPong = nullptr;

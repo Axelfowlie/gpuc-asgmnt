@@ -185,10 +185,8 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
 
 
   // Morton code for each bounding volume
-  m_clMortonCodes[0] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
-  m_clMortonCodes[1] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
-  m_clSortPermutation[0] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
-  m_clSortPermutation[1] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+  m_clMortonCodes = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+  m_clSortPermutation = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   // Ping-pong buffers for reorder 
   m_clRadixKeysPong = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   m_clRadixPermutationPong = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
@@ -507,26 +505,32 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // MORTON CODE AABB
   // #############
   if (res) {
+    // input AABBs from gpu
+    CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, m_clPositions);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clAABBLeaves[0], CL_TRUE, 0, m_nElements * sizeof(cl_float4), leafaabbmin.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clAABBLeaves[1], CL_TRUE, 0, m_nElements * sizeof(cl_float4), leafaabbmax.data(), 0, NULL, NULL),
+                "Error reading data from device!");
     // Time CPU
     timer.Start();
-    mortonaabb_cpu[0].s[0] = leafaabbmin_cpu[0].s[0];
-    mortonaabb_cpu[0].s[1] = leafaabbmin_cpu[0].s[1];
-    mortonaabb_cpu[0].s[2] = leafaabbmin_cpu[0].s[2];
-    mortonaabb_cpu[0].s[3] = leafaabbmin_cpu[0].s[3];
-    mortonaabb_cpu[1].s[0] = leafaabbmax_cpu[0].s[0];
-    mortonaabb_cpu[1].s[1] = leafaabbmax_cpu[0].s[1];
-    mortonaabb_cpu[1].s[2] = leafaabbmax_cpu[0].s[2];
-    mortonaabb_cpu[1].s[3] = leafaabbmax_cpu[0].s[3];
+    mortonaabb_cpu[0].s[0] = leafaabbmin[0].s[0];
+    mortonaabb_cpu[0].s[1] = leafaabbmin[0].s[1];
+    mortonaabb_cpu[0].s[2] = leafaabbmin[0].s[2];
+    mortonaabb_cpu[0].s[3] = leafaabbmin[0].s[3];
+    mortonaabb_cpu[1].s[0] = leafaabbmax[0].s[0];
+    mortonaabb_cpu[1].s[1] = leafaabbmax[0].s[1];
+    mortonaabb_cpu[1].s[2] = leafaabbmax[0].s[2];
+    mortonaabb_cpu[1].s[3] = leafaabbmax[0].s[3];
     for (size_t i = 1; i < m_nElements; ++i) {
-      mortonaabb_cpu[0].s[0] = std::min(mortonaabb_cpu[0].s[0], leafaabbmin_cpu[i].s[0]);
-      mortonaabb_cpu[0].s[1] = std::min(mortonaabb_cpu[0].s[1], leafaabbmin_cpu[i].s[1]);
-      mortonaabb_cpu[0].s[2] = std::min(mortonaabb_cpu[0].s[2], leafaabbmin_cpu[i].s[2]);
-      mortonaabb_cpu[0].s[3] = std::min(mortonaabb_cpu[0].s[3], leafaabbmin_cpu[i].s[3]);
+      mortonaabb_cpu[0].s[0] = std::min(mortonaabb_cpu[0].s[0], leafaabbmin[i].s[0]);
+      mortonaabb_cpu[0].s[1] = std::min(mortonaabb_cpu[0].s[1], leafaabbmin[i].s[1]);
+      mortonaabb_cpu[0].s[2] = std::min(mortonaabb_cpu[0].s[2], leafaabbmin[i].s[2]);
+      mortonaabb_cpu[0].s[3] = std::min(mortonaabb_cpu[0].s[3], leafaabbmin[i].s[3]);
 
-      mortonaabb_cpu[1].s[0] = std::max(mortonaabb_cpu[1].s[0], leafaabbmax_cpu[i].s[0]);
-      mortonaabb_cpu[1].s[1] = std::max(mortonaabb_cpu[1].s[1], leafaabbmax_cpu[i].s[1]);
-      mortonaabb_cpu[1].s[2] = std::max(mortonaabb_cpu[1].s[2], leafaabbmax_cpu[i].s[2]);
-      mortonaabb_cpu[1].s[3] = std::max(mortonaabb_cpu[1].s[3], leafaabbmax_cpu[i].s[3]);
+      mortonaabb_cpu[1].s[0] = std::max(mortonaabb_cpu[1].s[0], leafaabbmax[i].s[0]);
+      mortonaabb_cpu[1].s[1] = std::max(mortonaabb_cpu[1].s[1], leafaabbmax[i].s[1]);
+      mortonaabb_cpu[1].s[2] = std::max(mortonaabb_cpu[1].s[2], leafaabbmax[i].s[2]);
+      mortonaabb_cpu[1].s[3] = std::max(mortonaabb_cpu[1].s[3], leafaabbmax[i].s[3]);
     }
     timer.Stop();
     timecpu = timer.GetElapsedMilliseconds();
@@ -553,17 +557,23 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // MORTON CODES
   // #############
   if (res) {
+    // Input morton AABB from gpu
+    CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, m_clPositions);
+    MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonAABB, CL_TRUE, 0, sizeof(cl_float4) * 2, mortonaabb.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
     // Time CPU
     timer.Start();
     cl_float4 size;
-    size.s[0] = mortonaabb_cpu[1].s[0] - mortonaabb_cpu[0].s[0];
-    size.s[1] = mortonaabb_cpu[1].s[1] - mortonaabb_cpu[0].s[1];
-    size.s[2] = mortonaabb_cpu[1].s[2] - mortonaabb_cpu[0].s[2];
+    size.s[0] = mortonaabb[1].s[0] - mortonaabb[0].s[0];
+    size.s[1] = mortonaabb[1].s[1] - mortonaabb[0].s[1];
+    size.s[2] = mortonaabb[1].s[2] - mortonaabb[0].s[2];
     for (size_t i = 0; i < m_nElements; ++i) {
       cl_float4 p = positions[i];
-      p.s[0] = (p.s[0] - mortonaabb_cpu[0].s[0]) / size.s[0];
-      p.s[1] = (p.s[1] - mortonaabb_cpu[0].s[1]) / size.s[1];
-      p.s[2] = (p.s[2] - mortonaabb_cpu[0].s[2]) / size.s[2];
+      p.s[0] = (p.s[0] - mortonaabb[0].s[0]) / size.s[0];
+      p.s[1] = (p.s[1] - mortonaabb[0].s[1]) / size.s[1];
+      p.s[2] = (p.s[2] - mortonaabb[0].s[2]) / size.s[2];
 
       mortoncodes_cpu[i] = morton3D(p.s[0], p.s[1], p.s[2]);
     }
@@ -572,7 +582,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Time for GPU
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) MortonCodes(Context, CommandQueue, m_clMortonCodes[0], m_clPositions, m_clMortonAABB);
+    for (size_t i = 0; i < 100; ++i) MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
@@ -580,15 +590,15 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
     // Verify results
-    size.s[0] = mortonaabb_cpu[1].s[0] - mortonaabb_cpu[0].s[0];
-    size.s[1] = mortonaabb_cpu[1].s[1] - mortonaabb_cpu[0].s[1];
-    size.s[2] = mortonaabb_cpu[1].s[2] - mortonaabb_cpu[0].s[2];
-    size.s[3] = mortonaabb_cpu[1].s[3] - mortonaabb_cpu[0].s[3];
+    size.s[0] = mortonaabb[1].s[0] - mortonaabb[0].s[0];
+    size.s[1] = mortonaabb[1].s[1] - mortonaabb[0].s[1];
+    size.s[2] = mortonaabb[1].s[2] - mortonaabb[0].s[2];
+    size.s[3] = mortonaabb[1].s[3] - mortonaabb[0].s[3];
     for (size_t i = 0; i < m_nElements; ++i) {
       cl_float4 p = positions[i];
-      p.s[0] = (p.s[0] - mortonaabb_cpu[0].s[0]) / size.s[0];
-      p.s[1] = (p.s[1] - mortonaabb_cpu[0].s[1]) / size.s[1];
-      p.s[2] = (p.s[2] - mortonaabb_cpu[0].s[2]) / size.s[2];
+      p.s[0] = (p.s[0] - mortonaabb[0].s[0]) / size.s[0];
+      p.s[1] = (p.s[1] - mortonaabb[0].s[1]) / size.s[1];
+      p.s[2] = (p.s[2] - mortonaabb[0].s[2]) / size.s[2];
 
       if (p.s[0] < 0 || p.s[0] > 1 || p.s[1] < 0 || p.s[1] > 1 || p.s[2] < 0 || p.s[2] > 1) {
         cout << "PANIC" << endl;
@@ -598,10 +608,9 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
     // Verify results
-    MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
-    MortonCodes(Context, CommandQueue, m_clMortonCodes[0], m_clPositions, m_clMortonAABB);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
 
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes[0], CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
                 "Error reading data from device!");
 
     res = memcmp(mortoncodes.data(), mortoncodes_cpu.data(), mortoncodes.size() * sizeof(cl_uint)) == 0;
@@ -630,14 +639,14 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Time for GPU
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) PermutationIdentity(Context, CommandQueue, m_clSortPermutation[0]);
+    for (size_t i = 0; i < 100; ++i) PermutationIdentity(Context, CommandQueue, m_clSortPermutation);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
     // Validate correctness
-    PermutationIdentity(Context, CommandQueue, m_clSortPermutation[0]);
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation[0], CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
+    PermutationIdentity(Context, CommandQueue, m_clSortPermutation);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation, CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
                 "Error reading data from device!");
 
     res = memcmp(permutation.data(), permutation_cpu.data(), permutation.size() * sizeof(cl_uint)) == 0;
@@ -649,6 +658,11 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // RADIX FLAGS
   // #############
   if (res) {
+    // Input morton codes from gpu
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+    
     // Time for CPU
     timer.Start();
     for (size_t i = 0; i < m_nElements; ++i) {
@@ -665,19 +679,17 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     timecpu = timer.GetElapsedMilliseconds();
 
     // Time for GPU
-    V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clMortonCodes[0], CL_FALSE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
-                "Error writing random keys to cl memory!");
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
 
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
+    for (size_t i = 0; i < 100; ++i) SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
     // Validate correctness
-    V_RETURN_CL(clEnqueueWriteBuffer(CommandQueue, m_clMortonCodes[0], CL_FALSE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
-                "Error writing random keys to cl memory!");
-    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), zeroflags.data(), 0, NULL, NULL),
                 "Error reading data from device!");
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixOneBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), oneflags.data(), 0, NULL, NULL),
@@ -697,6 +709,12 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // SCAN
   // #############
   if (res) {
+    // Input flags from gpu
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), zeroflags_cpu.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
     // Time for CPU
     timer.Start();
     size_t sum = 0;
@@ -711,7 +729,8 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Time for GPU
     // Initialize buffers for scan with result from SelectBitflag
-    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
 
     timer.Start();
     for (size_t i = 0; i < 100; ++i) Scan(Context, CommandQueue, m_clRadixZeroBit);
@@ -721,7 +740,8 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
     // Validate correctness
-    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     Scan(Context, CommandQueue, m_clRadixZeroBit);
     Scan(Context, CommandQueue, m_clRadixOneBit);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), zeroflags.data(), 0, NULL, NULL),
@@ -755,6 +775,20 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // REORDER
   // #############
   if (res) {
+    // Input bit flag prefix sums from gpu
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+    Scan(Context, CommandQueue, m_clRadixZeroBit);
+    Scan(Context, CommandQueue, m_clRadixOneBit);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation, CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), zeroflags.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixOneBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), oneflags.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
     // Time for CPU
     // zeroflags and oneflags contains the correct result, that has been calculated in test for SCAN from the GPU
     // permutation contains the correct result, that has been calculated in test for PERMUTATION IDENTITY from the GPU
@@ -776,11 +810,13 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
     // Time for GPU
-    // Initialize buffers for scan with result from SelectBitflag
-    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
+    Scan(Context, CommandQueue, m_clRadixZeroBit);
+    Scan(Context, CommandQueue, m_clRadixOneBit);
     timer.Start();
     for (size_t i = 0; i < 100; ++i)
-      ReorderKeys(Context, CommandQueue, m_clMortonCodes[1], m_clSortPermutation[1], m_clMortonCodes[0], m_clSortPermutation[0], m_clRadixZeroBit,
+      ReorderKeys(Context, CommandQueue, m_clRadixKeysPong, m_clRadixPermutationPong, m_clMortonCodes, m_clSortPermutation, m_clRadixZeroBit,
                   m_clRadixOneBit, 0x0001);
     clFinish(CommandQueue);
     timer.Stop();
@@ -788,15 +824,16 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
     // Validate correctness
-    PermutationIdentity(Context, CommandQueue, m_clSortPermutation[0]);
-    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[0], 0x0001);
+    PermutationIdentity(Context, CommandQueue, m_clSortPermutation);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     Scan(Context, CommandQueue, m_clRadixZeroBit);
     Scan(Context, CommandQueue, m_clRadixOneBit);
-    ReorderKeys(Context, CommandQueue, m_clMortonCodes[1], m_clSortPermutation[1], m_clMortonCodes[0], m_clSortPermutation[0], m_clRadixZeroBit,
+    ReorderKeys(Context, CommandQueue, m_clRadixKeysPong, m_clRadixPermutationPong, m_clMortonCodes, m_clSortPermutation, m_clRadixZeroBit,
                 m_clRadixOneBit, 0x0001);
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes[1], CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodessort.data(), 0, NULL, NULL),
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixKeysPong, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodessort.data(), 0, NULL, NULL),
                 "Error reading data from device!");
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation[1], CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixPermutationPong, CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
                 "Error reading data from device!");
 
 
@@ -817,22 +854,24 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // RADIX SORT
   // #############
   if (res) {
-    for (size_t i = 0; i < m_nElements; ++i) mortoncodessort_cpu[i] = mortoncodes[i];
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodessort_cpu.data(), 0, NULL, NULL),
+                "Error reading data from device!");
     timer.Start();
     sort(mortoncodessort_cpu.begin(), mortoncodessort_cpu.end());
     timer.Stop();
     timecpu = timer.GetElapsedMilliseconds();
 
     timer.Start();
-    RadixSort(Context, CommandQueue, m_clMortonCodes[0], m_clSortPermutation[0]);
+    RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds();
 
 
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes[0], CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodessort.data(), 0, NULL, NULL),
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodessort.data(), 0, NULL, NULL),
                 "Error reading data from device!");
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation[0], CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation, CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
                 "Error reading data from device!");
 
     // ASSERT that morton codes and permutation are correct,
@@ -851,8 +890,11 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // PERMUTE
   // #############
   if (res) {
-    RadixSort(Context, CommandQueue, m_clMortonCodes[0], m_clSortPermutation[0]);
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation[0], CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clPositions, CL_TRUE, 0, m_nElements * sizeof(cl_float4), positions.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation, CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
                 "Error reading data from device!");
 
     timer.Start();
@@ -862,13 +904,15 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     timecpu = timer.GetElapsedMilliseconds();
 
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) Permute(Context, CommandQueue, m_clPermuteTemp, m_clPositions, m_clSortPermutation[0]);
+    for (size_t i = 0; i < 100; ++i) Permute(Context, CommandQueue, m_clPermuteTemp, m_clPositions, m_clSortPermutation);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
 
-    Permute(Context, CommandQueue, m_clPermuteTemp, m_clPositions, m_clSortPermutation[0]);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
+    Permute(Context, CommandQueue, m_clPermuteTemp, m_clPositions, m_clSortPermutation);
     swap(m_clPermuteTemp, m_clPositions);
 
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clPositions, CL_TRUE, 0, m_nElements * sizeof(cl_float4), positionssort.data(), 0, NULL, NULL),
@@ -901,6 +945,7 @@ void CCreateBVH::AdvancePositions(cl_context Context, cl_command_queue CommandQu
   clErr = clEnqueueNDRangeKernel(CommandQueue, m_AdvancePositionsKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 }
+
 void CCreateBVH::CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs[2], cl_mem positions) {
   cl_int clErr;
   // We need as many work items as elements
@@ -957,7 +1002,9 @@ void CCreateBVH::MortonCodeAABB(cl_context Context, cl_command_queue CommandQueu
   clErr = clEnqueueNDRangeKernel(CommandQueue, m_MortonCodeAABBKernel, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 }
-void CCreateBVH::MortonCodes(cl_context Context, cl_command_queue CommandQueue, cl_mem codes, cl_mem positions, cl_mem mortonaabb) {
+void CCreateBVH::MortonCodes(cl_context Context, cl_command_queue CommandQueue, cl_mem codes, cl_mem mortonaabb, cl_mem aabbs[2], cl_mem positions) {
+  MortonCodeAABB(Context, CommandQueue, mortonaabb, aabbs, positions);
+
   cl_int clErr;
   // We need as many work items as elements
   size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
