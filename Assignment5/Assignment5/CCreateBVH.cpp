@@ -189,10 +189,15 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   m_clMortonCodes[1] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   m_clSortPermutation[0] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   m_clSortPermutation[1] = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+  // Ping-pong buffers for reorder 
+  m_clRadixKeysPong = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+  m_clRadixPermutationPong = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   // Radix bit buffers
   // Buffers that holds the flags where the bit of the current radix is zero/one
   m_clRadixZeroBit = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   m_clRadixOneBit = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
+  // Temp buffer for the permute kernel to reorder positions and velocities
+  m_clPermuteTemp = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_float4) * m_nElements, NULL, &clError);
 
 
   // Sort kernels
@@ -206,6 +211,8 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   V_RETURN_FALSE_CL(clError, "Failed to create ReorderKeys kernel.");
   m_PermutationIdentityKernel = clCreateKernel(m_RadixSortProgram, "PermutationIdentity", &clError);
   V_RETURN_FALSE_CL(clError, "Failed to create PermutationIdentity kernel.");
+  m_PermuteKernel = clCreateKernel(m_RadixSortProgram, "Permute", &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create Permute kernel.");
 
 
   return true;
@@ -332,6 +339,7 @@ void CCreateBVH::ReleaseResources() {
   SAFE_RELEASE_KERNEL(m_SelectBitflagKernel);
   SAFE_RELEASE_KERNEL(m_ReorderKeysKernel);
   SAFE_RELEASE_KERNEL(m_PermutationIdentityKernel);
+  SAFE_RELEASE_KERNEL(m_PermuteKernel);
   SAFE_RELEASE_PROGRAM(m_RadixSortProgram);
 
   SAFE_RELEASE_KERNEL(m_ScanKernel);
@@ -360,8 +368,8 @@ void CCreateBVH::ComputeGPU(cl_context Context, cl_command_queue CommandQueue, s
 
   // DO THE CL STUFF HERE
 
-  AdvancePositions(Context, CommandQueue);
-  CreateLeafAABBs(Context, CommandQueue);
+  AdvancePositions(Context, CommandQueue, m_clPositions, m_clVelocities);
+  CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, m_clPositions);
 
 
 
@@ -451,15 +459,18 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   std::vector<cl_uint> mortoncodessort_cpu(m_nElements);
   std::vector<cl_uint> permutation(m_nElements);
   std::vector<cl_uint> permutation_cpu(m_nElements);
+  std::vector<cl_float4> positionssort(m_nElements);
+  std::vector<cl_float4> positionssort_cpu(m_nElements);
 
 
   // #############
   // CREATE LEAF NODE AABBs
   // #############
   if (res) {
-    // Time CPU
+    // Read input positions from gpu
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clPositions, CL_TRUE, 0, m_nElements * sizeof(cl_float4), positions.data(), 0, NULL, NULL),
                 "Error reading data from device!");
+    // Time CPU
     clFinish(CommandQueue);
     timer.Start();
     for (size_t i = 0; i < m_nElements; ++i) {
@@ -477,7 +488,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Time for GPU
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) CreateLeafAABBs(Context, CommandQueue);
+    for (size_t i = 0; i < 100; ++i) CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, m_clPositions);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
@@ -522,13 +533,13 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Time for GPU
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) MortonCodeAABB(Context, CommandQueue);
+    for (size_t i = 0; i < 100; ++i) MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
     // Verify results
-    MortonCodeAABB(Context, CommandQueue);
+    MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
 
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonAABB, CL_TRUE, 0, sizeof(cl_float4) * 2, mortonaabb.data(), 0, NULL, NULL),
                 "Error reading data from device!");
@@ -587,7 +598,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
     // Verify results
-    MortonCodeAABB(Context, CommandQueue);
+    MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
     MortonCodes(Context, CommandQueue, m_clMortonCodes[0], m_clPositions, m_clMortonAABB);
 
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes[0], CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
@@ -813,7 +824,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     timecpu = timer.GetElapsedMilliseconds();
 
     timer.Start();
-    RadixSort(Context, CommandQueue);
+    RadixSort(Context, CommandQueue, m_clMortonCodes[0], m_clSortPermutation[0]);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds();
@@ -836,6 +847,40 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   }
 
 
+  // #############
+  // PERMUTE
+  // #############
+  if (res) {
+    RadixSort(Context, CommandQueue, m_clMortonCodes[0], m_clSortPermutation[0]);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clSortPermutation[0], CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
+    timer.Start();
+    for (size_t i = 0; i < m_nElements; ++i) positionssort_cpu[i] = positions[permutation[i]];
+
+    timer.Stop();
+    timecpu = timer.GetElapsedMilliseconds();
+
+    timer.Start();
+    for (size_t i = 0; i < 100; ++i) Permute(Context, CommandQueue, m_clPermuteTemp, m_clPositions, m_clSortPermutation[0]);
+    clFinish(CommandQueue);
+    timer.Stop();
+    timegpu = timer.GetElapsedMilliseconds() / 100.0;
+
+
+    Permute(Context, CommandQueue, m_clPermuteTemp, m_clPositions, m_clSortPermutation[0]);
+    swap(m_clPermuteTemp, m_clPositions);
+
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clPositions, CL_TRUE, 0, m_nElements * sizeof(cl_float4), positionssort.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
+
+    // ASSERT that morton codes and permutation are correct,
+    res = memcmp(positionssort.data(), positionssort_cpu.data(), positionssort.size() * sizeof(cl_float4)) == 0;
+    print_info("PERMUTE", timecpu, timegpu, res);
+  }
+
+
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
 
@@ -843,27 +888,27 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 }
 
 
-void CCreateBVH::AdvancePositions(cl_context Context, cl_command_queue CommandQueue) {
+void CCreateBVH::AdvancePositions(cl_context Context, cl_command_queue CommandQueue, cl_mem positions, cl_mem velocities) {
   cl_int clErr;
   // We need as many work items as elements
   size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
 
-  clErr = clSetKernelArg(m_AdvancePositionsKernel, 0, sizeof(cl_mem), (void*)&m_clPositions);
-  clErr |= clSetKernelArg(m_AdvancePositionsKernel, 1, sizeof(cl_mem), (void*)&m_clVelocities);
+  clErr = clSetKernelArg(m_AdvancePositionsKernel, 0, sizeof(cl_mem), (void*)&positions);
+  clErr |= clSetKernelArg(m_AdvancePositionsKernel, 1, sizeof(cl_mem), (void*)&velocities);
   clErr |= clSetKernelArg(m_AdvancePositionsKernel, 2, sizeof(cl_uint), (void*)&m_nElements);
   V_RETURN_CL(clErr, "Error setting kernel arguments.");
 
   clErr = clEnqueueNDRangeKernel(CommandQueue, m_AdvancePositionsKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 }
-void CCreateBVH::CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue) {
+void CCreateBVH::CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs[2], cl_mem positions) {
   cl_int clErr;
   // We need as many work items as elements
   size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
 
-  clErr = clSetKernelArg(m_CreateLeafAABBsKernel, 0, sizeof(cl_mem), (void*)&m_clPositions);
-  clErr |= clSetKernelArg(m_CreateLeafAABBsKernel, 1, sizeof(cl_mem), (void*)&m_clAABBLeaves[0]);
-  clErr |= clSetKernelArg(m_CreateLeafAABBsKernel, 2, sizeof(cl_mem), (void*)&m_clAABBLeaves[1]);
+  clErr = clSetKernelArg(m_CreateLeafAABBsKernel, 0, sizeof(cl_mem), (void*)&positions);
+  clErr |= clSetKernelArg(m_CreateLeafAABBsKernel, 1, sizeof(cl_mem), (void*)&aabbs[0]);
+  clErr |= clSetKernelArg(m_CreateLeafAABBsKernel, 2, sizeof(cl_mem), (void*)&aabbs[1]);
   clErr |= clSetKernelArg(m_CreateLeafAABBsKernel, 3, sizeof(cl_uint), (void*)&m_nElements);
   V_RETURN_CL(clErr, "Error setting kernel arguments.");
 
@@ -893,10 +938,10 @@ void CCreateBVH::ReduceAABB(cl_context Context, cl_command_queue CommandQueue, c
     N = stride;
   }
 }
-void CCreateBVH::MortonCodeAABB(cl_context Context, cl_command_queue CommandQueue) {
-  CreateLeafAABBs(Context, CommandQueue);
-  ReduceAABB(Context, CommandQueue, m_clAABBLeaves[0], m_ReduceAABBminKernel);
-  ReduceAABB(Context, CommandQueue, m_clAABBLeaves[1], m_ReduceAABBmaxKernel);
+void CCreateBVH::MortonCodeAABB(cl_context Context, cl_command_queue CommandQueue, cl_mem mortonaabb, cl_mem aabbs[2], cl_mem positions) {
+  CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, positions);
+  ReduceAABB(Context, CommandQueue, aabbs[0], m_ReduceAABBminKernel);
+  ReduceAABB(Context, CommandQueue, aabbs[1], m_ReduceAABBmaxKernel);
 
 
   cl_int clErr;
@@ -904,22 +949,22 @@ void CCreateBVH::MortonCodeAABB(cl_context Context, cl_command_queue CommandQueu
   size_t globalWorkSize = 2;
   size_t localWorkSize = 2;
 
-  clErr = clSetKernelArg(m_MortonCodeAABBKernel, 0, sizeof(cl_mem), (void*)&m_clMortonAABB);
-  clErr = clSetKernelArg(m_MortonCodeAABBKernel, 1, sizeof(cl_mem), (void*)&m_clAABBLeaves[0]);
-  clErr = clSetKernelArg(m_MortonCodeAABBKernel, 2, sizeof(cl_mem), (void*)&m_clAABBLeaves[1]);
+  clErr = clSetKernelArg(m_MortonCodeAABBKernel, 0, sizeof(cl_mem), (void*)&mortonaabb);
+  clErr = clSetKernelArg(m_MortonCodeAABBKernel, 1, sizeof(cl_mem), (void*)&aabbs[0]);
+  clErr = clSetKernelArg(m_MortonCodeAABBKernel, 2, sizeof(cl_mem), (void*)&aabbs[1]);
   V_RETURN_CL(clErr, "Error setting kernel arguments.");
 
   clErr = clEnqueueNDRangeKernel(CommandQueue, m_MortonCodeAABBKernel, 1, NULL, &globalWorkSize, &localWorkSize, 0, NULL, NULL);
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 }
-void CCreateBVH::MortonCodes(cl_context Context, cl_command_queue CommandQueue, cl_mem codes, cl_mem positions, cl_mem aabb) {
+void CCreateBVH::MortonCodes(cl_context Context, cl_command_queue CommandQueue, cl_mem codes, cl_mem positions, cl_mem mortonaabb) {
   cl_int clErr;
   // We need as many work items as elements
   size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
 
   clErr = clSetKernelArg(m_MortonCodesKernel, 0, sizeof(cl_mem), (void*)&codes);
   clErr = clSetKernelArg(m_MortonCodesKernel, 1, sizeof(cl_mem), (void*)&positions);
-  clErr = clSetKernelArg(m_MortonCodesKernel, 2, sizeof(cl_mem), (void*)&aabb);
+  clErr = clSetKernelArg(m_MortonCodesKernel, 2, sizeof(cl_mem), (void*)&mortonaabb);
   clErr = clSetKernelArg(m_MortonCodesKernel, 3, sizeof(cl_uint), (void*)&m_nElements);
   V_RETURN_CL(clErr, "Error setting kernel arguments.");
 
@@ -1012,9 +1057,12 @@ void CCreateBVH::ReorderKeys(cl_context Context, cl_command_queue CommandQueue, 
   clErr = clEnqueueNDRangeKernel(CommandQueue, m_ReorderKeysKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 }
-void CCreateBVH::RadixSort(cl_context Context, cl_command_queue CommandQueue) {
+void CCreateBVH::RadixSort(cl_context Context, cl_command_queue CommandQueue, cl_mem keys, cl_mem permutation) {
+  cl_mem keyspingpong[2] = {keys, m_clRadixKeysPong};
+  cl_mem permutationpingpong[2] = {permutation, m_clRadixPermutationPong};
+
   // Initialize the first source permutation to the ascending numbers from 0 to m_nElements
-  PermutationIdentity(Context, CommandQueue, m_clSortPermutation[0]);
+  PermutationIdentity(Context, CommandQueue, permutationpingpong[0]);
 
   // For each bit stable sort
   for (size_t i = 0; i < 32; ++i) {
@@ -1025,14 +1073,28 @@ void CCreateBVH::RadixSort(cl_context Context, cl_command_queue CommandQueue) {
     int dst = (i + 1) % 2;
 
     // Extract the flags for the current bit.
-    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes[src], mask);
+    SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, keyspingpong[src], mask);
     // Scan on each buffer of flags
     Scan(Context, CommandQueue, m_clRadixZeroBit);
     Scan(Context, CommandQueue, m_clRadixOneBit);
     // Reorder
-    ReorderKeys(Context, CommandQueue, m_clMortonCodes[dst], m_clSortPermutation[dst], m_clMortonCodes[src], m_clSortPermutation[src], m_clRadixZeroBit,
+    ReorderKeys(Context, CommandQueue, keyspingpong[dst], permutationpingpong[dst], keyspingpong[src], permutationpingpong[src], m_clRadixZeroBit,
                 m_clRadixOneBit, mask);
   }
+}
+void CCreateBVH::Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem to, cl_mem from, cl_mem permutation) {
+  cl_int clErr;
+  // We need as many work items as elements
+  size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
+
+  clErr = clSetKernelArg( m_PermuteKernel, 0, sizeof(cl_mem), (void*)&to);
+  clErr |= clSetKernelArg(m_PermuteKernel, 1, sizeof(cl_mem), (void*)&from);
+  clErr |= clSetKernelArg(m_PermuteKernel, 2, sizeof(cl_mem), (void*)&permutation);
+  clErr |= clSetKernelArg(m_PermuteKernel, 3, sizeof(cl_uint), (void*)&m_nElements);
+  V_RETURN_CL(clErr, "Error setting kernel arguments.");
+
+  clErr = clEnqueueNDRangeKernel(CommandQueue, m_PermuteKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
+  V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 }
 
 

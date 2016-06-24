@@ -52,10 +52,10 @@ public:
   virtual void TestPerformance(cl_context Context, cl_command_queue CommandQueue);
 
 
-  void AdvancePositions(cl_context Context, cl_command_queue CommandQueue);
-  void CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue);
+  void AdvancePositions(cl_context Context, cl_command_queue CommandQueue, cl_mem positions, cl_mem velocities);
+  void CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs[2], cl_mem positions);
   void ReduceAABB(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs, cl_kernel Kernel);
-  void MortonCodeAABB(cl_context Context, cl_command_queue CommandQueue);
+  void MortonCodeAABB(cl_context Context, cl_command_queue CommandQueue, cl_mem mortonaabb, cl_mem aabbs[2], cl_mem positions);
   void MortonCodes(cl_context Context, cl_command_queue CommandQueue, cl_mem codes, cl_mem positions, cl_mem aabb);
 
   void PermutationIdentity(cl_context Context, cl_command_queue CommandQueue, cl_mem permutation);
@@ -63,7 +63,8 @@ public:
   void Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem inoutbuffer);
   void ReorderKeys(cl_context Context, cl_command_queue CommandQueue, cl_mem keysout, cl_mem permutationout, cl_mem keysin, cl_mem permutationin,
                    cl_mem indexzerobits, cl_mem indexonebits, cl_uint mask);
-  void RadixSort(cl_context Context, cl_command_queue CommandQueue);
+  void RadixSort(cl_context Context, cl_command_queue CommandQueue, cl_mem keys, cl_mem permutation);
+  void Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem to, cl_mem from, cl_mem permutation);
 
 
   // Not implemented!
@@ -125,14 +126,20 @@ protected:
   // Ping-pongin needed in the reorder kernel
   cl_mem m_clMortonCodes[2] = {nullptr, nullptr};
   cl_mem m_clSortPermutation[2] = {nullptr, nullptr};
+  // Ping-pong buffers for reordering morton codes and permutation
+  cl_mem m_clRadixKeysPong = nullptr;
+  cl_mem m_clRadixPermutationPong = nullptr;
   // Buffers to hold the flags for the current sorted radix
   cl_mem m_clRadixZeroBit = nullptr;
   cl_mem m_clRadixOneBit = nullptr;
+  // Temp memory to permute the positions and velocities
+  cl_mem m_clPermuteTemp = nullptr;
 
   cl_program m_RadixSortProgram = nullptr;
   cl_kernel m_SelectBitflagKernel = nullptr;
   cl_kernel m_ReorderKeysKernel = nullptr;
   cl_kernel m_PermutationIdentityKernel = nullptr;
+  cl_kernel m_PermuteKernel = nullptr;
   
   // PARALLEL SCAN FOR RADIX SORT
   // Arrays for each level of the work-efficient scan

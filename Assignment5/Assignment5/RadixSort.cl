@@ -53,3 +53,12 @@ __kernel void PermutationIdentity(__global uint* permutation) {
   int GID = get_global_id(0);
   permutation[GID] = GID;
 }
+
+
+__kernel void Permute(__global float4* to, const __global float4* from, const __global uint* permutation, uint N) {
+  int GID = get_global_id(0);
+
+  if (GID >= N) return;
+
+  to[GID] = from[permutation[GID]];
+}
