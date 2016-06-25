@@ -65,7 +65,7 @@ public:
   void ReorderKeys(cl_context Context, cl_command_queue CommandQueue, cl_mem keysout, cl_mem permutationout, cl_mem keysin, cl_mem permutationin,
                    cl_mem indexzerobits, cl_mem indexonebits, cl_uint mask);
   void RadixSort(cl_context Context, cl_command_queue CommandQueue, cl_mem keys, cl_mem permutation);
-  void Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem to, cl_mem from, cl_mem permutation);
+  void Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem *from, cl_mem permutation);
 
 
   // Not implemented!
@@ -109,17 +109,30 @@ protected:
   GLuint m_glAABBLeafTB[2] = { 0, 0 };
   GLuint m_glAABBNodeBuf[2] = { 0, 0 };
   GLuint m_glAABBNodeTB[2] = { 0, 0 };
+
+  // One buffer to index the left and right child for each internal node
+  cl_mem m_clNodeChilds = nullptr;
+  GLuint m_glNodeChildsBuf = 0;
+  GLuint m_glNodeChildsTB = 0;
+  // One buffer to index the parent for each nodes
+  cl_mem m_clNodeParents = nullptr;
+  GLuint m_glNodeParentsBuf = 0;
+  GLuint m_glNodeParentsTB = 0;
+
   
+  // Kernels to advance centerpositions and create the leaf node AABBs
   cl_program m_PrepAABBsProgram = nullptr;
   cl_kernel m_AdvancePositionsKernel = nullptr;
   cl_kernel m_CreateLeafAABBsKernel = nullptr;
-
+  // Kernels for calculating the morton codes
   cl_program m_MortonCodesProgram = nullptr;
   cl_kernel m_ReduceAABBminKernel = nullptr;
   cl_kernel m_ReduceAABBmaxKernel = nullptr;
   cl_kernel m_MortonCodeAABBKernel = nullptr;
   cl_kernel m_MortonCodesKernel = nullptr;
-
+  // Kernels for creating the parent-child node relationships
+  cl_program m_BVHNodesProgram = nullptr;
+  cl_kernel m_NodesHierarchyKernel = nullptr;
 
 
   // RADIX SORT
@@ -159,6 +172,7 @@ protected:
   //
   //
 
+  GLint aabbminmax;
 
 
   std::string m_CollisionMeshPath;
@@ -167,6 +181,7 @@ protected:
 
 
   GLhandleARB m_VSParticles = 0;
+  GLhandleARB m_GSParticles = 0;
   GLhandleARB m_PSParticles = 0;
   GLhandleARB m_ProgRenderParticles = 0;
 

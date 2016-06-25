@@ -2,10 +2,10 @@ let SessionLoad = 1
 if &cp | set nocp | endif
 let s:cpo_save=&cpo
 set cpo&vim
-inoremap <expr> <Down> pumvisible() ? "\" : "\<Down>"
-inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
-imap <Nul> <C-Space>
 inoremap <C-Space> 
+imap <Nul> <C-Space>
+inoremap <expr> <Up> pumvisible() ? "\" : "\<Up>"
+inoremap <expr> <Down> pumvisible() ? "\" : "\<Down>"
 imap <S-Tab> <Plug>SuperTabBackward
 inoremap <silent> <C-Tab> =UltiSnips#ListSnippets()
 map! <S-Insert> <MiddleMouse>
@@ -25,17 +25,17 @@ nnoremap  :tab split
 nnoremap  :tabclose
 nnoremap  :tab split:exec("tag ".expand("<cword>"))
 nnoremap   zz
-nnoremap <silent> $ g$
-xnoremap <silent> $ g$
 onoremap <silent> $ g$
+xnoremap <silent> $ g$
+nnoremap <silent> $ g$
 snoremap <silent> $ g$
-nmap ,hu <Plug>GitGutterUndoHunk
-nnoremap ,d :YcmShowDetailedDiagnostic
-nnoremap ,df :call ClangFormatFile()
-nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
-nnoremap ,ct :!ctags -R .
-xnoremap ,cp "+p
 xnoremap ,cy "+y
+xnoremap ,cp "+p
+nnoremap ,ct :!ctags -R .
+nnoremap ,dd :pyf /usr/share/vim/addons/syntax/clang-format-3.6.py
+nnoremap ,df :call ClangFormatFile()
+nnoremap ,d :YcmShowDetailedDiagnostic
+nmap ,hu <Plug>GitGutterUndoHunk
 nmap ,hp <Plug>GitGutterPreviewHunk
 nmap ,hr <Plug>GitGutterUndoHunk:echomsg ',hr is deprecated. Use ,hu'
 nmap ,hs <Plug>GitGutterStageHunk
@@ -55,9 +55,9 @@ nnoremap ,gs :tabe %:Gstatus:resize 30
 nnoremap ,o :tabe:CtrlP
 nnoremap ,tl :tabe:Ag TODO
 nnoremap ,ag :tabe:Ag 
-nnoremap <silent> 0 g0
-xnoremap <silent> 0 g0
 onoremap <silent> 0 g0
+xnoremap <silent> 0 g0
+nnoremap <silent> 0 g0
 snoremap <silent> 0 g0
 nnoremap G Gzz
 nnoremap <silent> H :wincmd h
@@ -67,48 +67,48 @@ nnoremap <silent> L :wincmd l
 nnoremap N Nzz
 nmap [c <Plug>GitGutterPrevHunk
 nmap ]c <Plug>GitGutterNextHunk
-omap ac <Plug>GitGutterTextObjectOuterPending
 xmap ac <Plug>GitGutterTextObjectOuterVisual
+omap ac <Plug>GitGutterTextObjectOuterPending
 xmap gx <Plug>NetrwBrowseXVis
 smap gx <Plug>NetrwBrowseXVis
 nmap gx <Plug>NetrwBrowseX
-omap ic <Plug>GitGutterTextObjectInnerPending
 xmap ic <Plug>GitGutterTextObjectInnerVisual
-nnoremap <silent> j gj
-xnoremap <silent> j gj
+omap ic <Plug>GitGutterTextObjectInnerPending
 onoremap <silent> j gj
+xnoremap <silent> j gj
+nnoremap <silent> j gj
 snoremap <silent> j gj
-nnoremap <silent> k gk
-xnoremap <silent> k gk
 onoremap <silent> k gk
+xnoremap <silent> k gk
+nnoremap <silent> k gk
 snoremap <silent> k gk
 nnoremap n nzz
 nnoremap zL zMzR:call ToggleFoldComments()
 nnoremap zl :call ToggleFoldComments()
-nnoremap <SNR>27_: :=v:count ? v:count : ''
-onoremap <silent> <Plug>GitGutterTextObjectInnerPending :call gitgutter#hunk#text_object(1)
-onoremap <silent> <Plug>GitGutterTextObjectOuterPending :call gitgutter#hunk#text_object(0)
-xnoremap <silent> <Plug>GitGutterTextObjectInnerVisual :call gitgutter#hunk#text_object(1)
-xnoremap <silent> <Plug>GitGutterTextObjectOuterVisual :call gitgutter#hunk#text_object(0)
-nnoremap <silent> <Plug>GitGutterUndoHunk :GitGutterUndoHunk
-noremap <silent> <Plug>AirlineSelectTab1 :1tabn
-noremap <silent> <Plug>AirlineSelectTab2 :2tabn
-noremap <silent> <Plug>AirlineSelectTab3 :3tabn
-noremap <silent> <Plug>AirlineSelectTab4 :4tabn
-noremap <silent> <Plug>AirlineSelectTab5 :5tabn
-noremap <silent> <Plug>AirlineSelectTab6 :6tabn
-noremap <silent> <Plug>AirlineSelectTab7 :7tabn
-noremap <silent> <Plug>AirlineSelectTab8 :8tabn
-noremap <silent> <Plug>AirlineSelectTab9 :9tabn
-noremap <silent> <Plug>AirlineSelectPrevTab gT
-noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
-noremap <F4> :FSHere
-map <F7> :make -C ./build/
-map <S-F7> :make clean all -C ./build/
-nnoremap <C-Up> :cw
-nnoremap <C-Down> :ccl
-nnoremap <C-Left> :cp
 nnoremap <C-Right> :cn
+nnoremap <C-Left> :cp
+nnoremap <C-Down> :ccl
+nnoremap <C-Up> :cw
+map <S-F7> :make clean all -C ./build/
+map <F7> :make -C ./build/
+noremap <F4> :FSHere
+noremap <silent> <Plug>AirlineSelectNextTab :exe repeat(':tabn|', v:count1)
+noremap <silent> <Plug>AirlineSelectPrevTab gT
+noremap <silent> <Plug>AirlineSelectTab9 :9tabn
+noremap <silent> <Plug>AirlineSelectTab8 :8tabn
+noremap <silent> <Plug>AirlineSelectTab7 :7tabn
+noremap <silent> <Plug>AirlineSelectTab6 :6tabn
+noremap <silent> <Plug>AirlineSelectTab5 :5tabn
+noremap <silent> <Plug>AirlineSelectTab4 :4tabn
+noremap <silent> <Plug>AirlineSelectTab3 :3tabn
+noremap <silent> <Plug>AirlineSelectTab2 :2tabn
+noremap <silent> <Plug>AirlineSelectTab1 :1tabn
+nnoremap <silent> <Plug>GitGutterUndoHunk :GitGutterUndoHunk
+xnoremap <silent> <Plug>GitGutterTextObjectOuterVisual :call gitgutter#hunk#text_object(0)
+xnoremap <silent> <Plug>GitGutterTextObjectInnerVisual :call gitgutter#hunk#text_object(1)
+onoremap <silent> <Plug>GitGutterTextObjectOuterPending :call gitgutter#hunk#text_object(0)
+onoremap <silent> <Plug>GitGutterTextObjectInnerPending :call gitgutter#hunk#text_object(1)
+nnoremap <SNR>27_: :=v:count ? v:count : ''
 vnoremap <silent> <Plug>NetrwBrowseXVis :call netrw#BrowseXVis()
 nnoremap <silent> <Plug>NetrwBrowseX :call netrw#BrowseX(expand((exists("g:netrw_gx")? g:netrw_gx : '<cfile>')),netrw#CheckIfRemote())
 snoremap <silent> <Del> c
@@ -211,6 +211,8 @@ badd +27 Assignment5/particles.vert
 badd +1 Assignment5/CreateLeafAABBs.cl
 badd +1 Assignment5/PrepAABBs.cl
 badd +1 Assignment5/MortonCodes.cl
+badd +31 Common/IGUIEnabledComputeTask.h
+badd +1 ~/Documents/studium/GPU\ Praktikum/gpuc-asgmnt/Assignment5/Common/IGUIEnabledComputeTask.cpp
 argglobal
 silent! argdel *
 edit Assignment5/CAssignment5.cpp
@@ -271,7 +273,7 @@ setlocal formatoptions=croql
 setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
 setlocal grepprg=
 setlocal iminsert=0
-setlocal imsearch=2
+setlocal imsearch=0
 setlocal include=
 setlocal includeexpr=
 setlocal indentexpr=
@@ -329,16 +331,24 @@ setlocal wrap
 setlocal wrapmargin=0
 39
 normal! zo
+65
+normal! zo
+67
+normal! zo
+67
+normal! zc
 199
 normal! zo
 199
 normal! zc
-let s:l = 23 - ((22 * winheight(0) + 29) / 58)
+260
+normal! zo
+let s:l = 55 - ((35 * winheight(0) + 29) / 58)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-23
-normal! 0
+55
+normal! 047|
 tabedit Assignment5/CCreateBVH.h
 set splitbelow splitright
 wincmd t
@@ -455,12 +465,12 @@ setlocal wrap
 setlocal wrapmargin=0
 37
 normal! zo
-let s:l = 119 - ((32 * winheight(0) + 29) / 58)
+let s:l = 162 - ((32 * winheight(0) + 29) / 58)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-119
-normal! 025|
+162
+normal! 019|
 tabedit Assignment5/CCreateBVH.cpp
 set splitbelow splitright
 wincmd t
@@ -576,12 +586,14 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
-let s:l = 915 - ((878 * winheight(0) + 29) / 58)
+360
+normal! zo
+let s:l = 383 - ((313 * winheight(0) + 29) / 58)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-915
-normal! 01|
+383
+normal! 0
 tabedit Assignment5/MortonCodes.cl
 set splitbelow splitright
 wincmd t
@@ -697,15 +709,285 @@ setlocal nowinfixheight
 setlocal nowinfixwidth
 setlocal wrap
 setlocal wrapmargin=0
+4
+normal! zo
+14
+normal! zo
+25
+normal! zo
+33
+normal! zo
+48
+normal! zo
 56
 normal! zo
-let s:l = 56 - ((55 * winheight(0) + 29) / 58)
+14
+normal! zo
+25
+normal! zo
+33
+normal! zo
+48
+normal! zo
+56
+normal! zo
+let s:l = 8 - ((7 * winheight(0) + 29) / 58)
 if s:l < 1 | let s:l = 1 | endif
 exe s:l
 normal! zt
-56
-normal! 088|
-tabnext 4
+8
+normal! 09|
+tabedit Assignment5/RadixSort.cl
+set splitbelow splitright
+wincmd t
+set winheight=1 winwidth=1
+argglobal
+setlocal keymap=
+setlocal noarabic
+setlocal autoindent
+setlocal backupcopy=
+setlocal balloonexpr=
+setlocal nobinary
+setlocal nobreakindent
+setlocal breakindentopt=
+setlocal bufhidden=
+setlocal buflisted
+setlocal buftype=
+setlocal cindent
+setlocal cinkeys=0{,0},0),:,0#,!^F,o,O,e
+setlocal cinoptions=
+setlocal cinwords=if,else,while,do,for,switch
+setlocal colorcolumn=
+setlocal comments=sO:*\ -,mO:*\ \ ,exO:*/,s1:/*,mb:*,ex:*/,://
+setlocal commentstring=/*%s*/
+setlocal complete=.,w,b,u,t,i
+setlocal concealcursor=
+setlocal conceallevel=0
+setlocal completefunc=youcompleteme#Complete
+setlocal nocopyindent
+setlocal cryptmethod=
+setlocal nocursorbind
+setlocal nocursorcolumn
+set cursorline
+setlocal cursorline
+setlocal define=^\\s*#\\s*define
+setlocal dictionary=
+setlocal nodiff
+setlocal equalprg=
+setlocal errorformat=
+setlocal expandtab
+if &filetype != 'cpp'
+setlocal filetype=cpp
+endif
+setlocal foldcolumn=0
+setlocal foldenable
+setlocal foldexpr=0
+setlocal foldignore=#
+setlocal foldlevel=0
+setlocal foldmarker={{{,}}}
+set foldmethod=syntax
+setlocal foldmethod=syntax
+setlocal foldminlines=1
+setlocal foldnestmax=20
+setlocal foldtext=foldtext()
+setlocal formatexpr=
+setlocal formatoptions=croql
+setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
+setlocal grepprg=
+setlocal iminsert=0
+setlocal imsearch=0
+setlocal include=
+setlocal includeexpr=
+setlocal indentexpr=
+setlocal indentkeys=0{,0},:,0#,!^F,o,O,e
+setlocal noinfercase
+setlocal iskeyword=@,48-57,_,192-255
+setlocal keywordprg=
+setlocal nolinebreak
+setlocal nolisp
+setlocal lispwords=
+setlocal nolist
+setlocal makeprg=
+setlocal matchpairs=(:),{:},[:]
+setlocal modeline
+setlocal modifiable
+setlocal nrformats=octal,hex
+set number
+setlocal number
+setlocal numberwidth=4
+setlocal omnifunc=youcompleteme#OmniComplete
+setlocal path=
+setlocal nopreserveindent
+setlocal nopreviewwindow
+setlocal quoteescape=\\
+setlocal noreadonly
+set relativenumber
+setlocal relativenumber
+setlocal norightleft
+setlocal rightleftcmd=search
+setlocal noscrollbind
+setlocal shiftwidth=2
+setlocal noshortname
+setlocal smartindent
+setlocal softtabstop=0
+set spell
+setlocal spell
+setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
+setlocal spellfile=
+setlocal spelllang=en_us
+setlocal statusline=%!airline#statusline(1)
+setlocal suffixesadd=
+setlocal swapfile
+setlocal synmaxcol=3000
+if &syntax != 'cpp'
+setlocal syntax=cpp
+endif
+setlocal tabstop=2
+setlocal tags=
+setlocal textwidth=0
+setlocal thesaurus=
+setlocal noundofile
+setlocal undolevels=-123456
+setlocal nowinfixheight
+setlocal nowinfixwidth
+setlocal wrap
+setlocal wrapmargin=0
+34
+normal! zo
+34
+normal! zc
+52
+normal! zo
+58
+normal! zo
+let s:l = 58 - ((57 * winheight(0) + 29) / 58)
+if s:l < 1 | let s:l = 1 | endif
+exe s:l
+normal! zt
+58
+normal! 0
+tabedit Assignment5/particles.vert
+set splitbelow splitright
+wincmd t
+set winheight=1 winwidth=1
+argglobal
+setlocal keymap=
+setlocal noarabic
+setlocal autoindent
+setlocal backupcopy=
+setlocal balloonexpr=
+setlocal nobinary
+setlocal nobreakindent
+setlocal breakindentopt=
+setlocal bufhidden=
+setlocal buflisted
+setlocal buftype=
+setlocal nocindent
+setlocal cinkeys=0{,0},0),:,0#,!^F,o,O,e
+setlocal cinoptions=
+setlocal cinwords=if,else,while,do,for,switch
+setlocal colorcolumn=
+setlocal comments=:#
+setlocal commentstring=#\ %s
+setlocal complete=.,w,b,u,t,i
+setlocal concealcursor=
+setlocal conceallevel=0
+setlocal completefunc=youcompleteme#Complete
+setlocal nocopyindent
+setlocal cryptmethod=
+setlocal nocursorbind
+setlocal nocursorcolumn
+set cursorline
+setlocal cursorline
+setlocal define=
+setlocal dictionary=
+setlocal nodiff
+setlocal equalprg=
+setlocal errorformat=
+setlocal expandtab
+if &filetype != 'conf'
+setlocal filetype=conf
+endif
+setlocal foldcolumn=0
+setlocal foldenable
+setlocal foldexpr=0
+setlocal foldignore=#
+setlocal foldlevel=0
+setlocal foldmarker={{{,}}}
+set foldmethod=syntax
+setlocal foldmethod=syntax
+setlocal foldminlines=1
+setlocal foldnestmax=20
+setlocal foldtext=foldtext()
+setlocal formatexpr=
+setlocal formatoptions=croql
+setlocal formatlistpat=^\\s*\\d\\+[\\]:.)}\\t\ ]\\s*
+setlocal grepprg=
+setlocal iminsert=0
+setlocal imsearch=0
+setlocal include=
+setlocal includeexpr=
+setlocal indentexpr=
+setlocal indentkeys=0{,0},:,0#,!^F,o,O,e
+setlocal noinfercase
+setlocal iskeyword=@,48-57,_,192-255
+setlocal keywordprg=
+setlocal nolinebreak
+setlocal nolisp
+setlocal lispwords=
+setlocal nolist
+setlocal makeprg=
+setlocal matchpairs=(:),{:},[:]
+setlocal modeline
+setlocal modifiable
+setlocal nrformats=octal,hex
+set number
+setlocal number
+setlocal numberwidth=4
+setlocal omnifunc=
+setlocal path=
+setlocal nopreserveindent
+setlocal nopreviewwindow
+setlocal quoteescape=\\
+setlocal noreadonly
+set relativenumber
+setlocal relativenumber
+setlocal norightleft
+setlocal rightleftcmd=search
+setlocal noscrollbind
+setlocal shiftwidth=2
+setlocal noshortname
+setlocal smartindent
+setlocal softtabstop=0
+set spell
+setlocal spell
+setlocal spellcapcheck=[.?!]\\_[\\])'\"\	\ ]\\+
+setlocal spellfile=
+setlocal spelllang=en_us
+setlocal statusline=%!airline#statusline(1)
+setlocal suffixesadd=
+setlocal swapfile
+setlocal synmaxcol=3000
+if &syntax != 'conf'
+setlocal syntax=conf
+endif
+setlocal tabstop=2
+setlocal tags=
+setlocal textwidth=0
+setlocal thesaurus=
+setlocal noundofile
+setlocal undolevels=-123456
+setlocal nowinfixheight
+setlocal nowinfixwidth
+setlocal wrap
+setlocal wrapmargin=0
+let s:l = 36 - ((35 * winheight(0) + 29) / 58)
+if s:l < 1 | let s:l = 1 | endif
+exe s:l
+normal! zt
+36
+normal! 03|
+tabnext 3
 if exists('s:wipebuf')
   silent exe 'bwipe ' . s:wipebuf
 endif

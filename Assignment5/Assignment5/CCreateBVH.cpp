@@ -17,11 +17,13 @@ GPU Computing / GPGPU Praktikum source code.
 
 #include "HLSLEx.h"
 
+#include <set>
 #include <string>
 #include <algorithm>
 #include <string.h>
 #include <iomanip>
 
+#include <sstream>
 
 #include "CL/cl_gl.h"
 
@@ -96,7 +98,7 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
     p.s[0] = (float(rand()) / float(RAND_MAX) * 10.0f - 5.0f);
     p.s[1] = (float(rand()) / float(RAND_MAX) * 10.0f - 5.0f);
     p.s[2] = (float(rand()) / float(RAND_MAX) * 10.0f - 5.0f);
-    p.s[3] = (float(rand()) / float(RAND_MAX) * 10.0f - 5.0f);
+    p.s[3] = (float(rand()) / float(RAND_MAX) * 0.1 + 0.1f);
   }
   V_RETURN_FALSE_CL(clEnqueueWriteBuffer(CommandQueue, m_clPositions, CL_FALSE, 0, m_nElements * sizeof(cl_float4), initpos.data(), 0, NULL, NULL),
                     "Error writing positions to cl memory!");
@@ -128,6 +130,11 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   m_clMortonAABB = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_float4) * 2, NULL, &clError);
   V_RETURN_FALSE_CL(clError, "Failed to create MortonAABB buffer.");
 
+  // Create buffers for internal node's children and parents indices
+  m_clNodeChilds = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glNodeChildsBuf, &clError);
+  m_clNodeParents = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glNodeParentsBuf, &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create internal nodes buffer.");
+
 
 
   // Kernel for building the leaf node AABBs from the center position and radius
@@ -144,7 +151,7 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   // Kernel for calculating morton codes
   CLUtil::LoadProgramSourceToMemory("MortonCodes.cl", programCode);
   m_MortonCodesProgram = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
-  if (!m_PrepAABBsProgram) return false;
+  if (!m_MortonCodesProgram) return false;
 
   m_ReduceAABBminKernel = clCreateKernel(m_MortonCodesProgram, "ReduceAABBmin", &clError);
   V_RETURN_FALSE_CL(clError, "Failed to create ReduceAABBkernelmin kernel.");
@@ -157,6 +164,13 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   V_RETURN_FALSE_CL(clError, "Failed to create MortonCodes kernel.");
 
 
+  // Kernel for calculating internal nodes
+  //CLUtil::LoadProgramSourceToMemory("BVHNodes.cl", programCode);
+  //m_BVHNodesProgram = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
+  //if (!m_BVHNodesProgram) return false;
+
+  //m_NodesHierarchyKernel = clCreateKernel(m_BVHNodesProgram, "NodesHierarchy", &clError);
+  //V_RETURN_FALSE_CL(clError, "Failed to create NodesHierarchy kernel.");
 
   //
   //
@@ -187,7 +201,7 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   // Morton code for each bounding volume
   m_clMortonCodes = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   m_clSortPermutation = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
-  // Ping-pong buffers for reorder 
+  // Ping-pong buffers for reorder
   m_clRadixKeysPong = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   m_clRadixPermutationPong = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_clScanLevels[0].second, NULL, &clError);
   // Radix bit buffers
@@ -234,7 +248,7 @@ bool CCreateBVH::InitGL() {
 
 
 
-  // Create buffers for leaf nodes
+  // Create buffers for leaf node AABBs
   glGenBuffers(2, m_glAABBLeafBuf);
   glBindBuffer(GL_ARRAY_BUFFER, m_glAABBLeafBuf[0]);
   glBufferData(GL_ARRAY_BUFFER, m_nElements * sizeof(cl_float4), NULL, GL_DYNAMIC_DRAW);
@@ -244,16 +258,16 @@ bool CCreateBVH::InitGL() {
 
   // Create texture buffers
   glGenTextures(2, m_glAABBLeafTB);
-  glBindTexture(GL_TEXTURE_BUFFER_EXT, m_glAABBLeafTB[0]);
-  glTexBufferEXT(GL_TEXTURE_BUFFER_EXT, GL_RGBA32F_ARB, m_glAABBLeafBuf[0]);
-  glBindTexture(GL_TEXTURE_BUFFER_EXT, m_glAABBLeafTB[1]);
-  glTexBufferEXT(GL_TEXTURE_BUFFER_EXT, GL_RGBA32F_ARB, m_glAABBLeafBuf[1]);
-  glBindBuffer(GL_TEXTURE_BUFFER_EXT, 0);
-  glBindTexture(GL_TEXTURE_BUFFER_EXT, 0);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[0]);
+  glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F_ARB, m_glAABBLeafBuf[0]);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[1]);
+  glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F_ARB, m_glAABBLeafBuf[1]);
+  glBindBuffer(GL_TEXTURE_BUFFER, 0);
+  glBindTexture(GL_TEXTURE_BUFFER, 0);
   CHECK_FOR_OGL_ERROR();
 
 
-  // Create buffers for inner nodes
+  // Create buffers for inner node AABBs
   glGenBuffers(2, m_glAABBNodeBuf);
   glBindBuffer(GL_ARRAY_BUFFER, m_glAABBNodeBuf[0]);
   glBufferData(GL_ARRAY_BUFFER, m_nElements * sizeof(cl_float4), NULL, GL_DYNAMIC_DRAW);
@@ -263,12 +277,44 @@ bool CCreateBVH::InitGL() {
 
   // Create texture buffers
   glGenTextures(2, m_glAABBNodeTB);
-  glBindTexture(GL_TEXTURE_BUFFER_EXT, m_glAABBNodeTB[0]);
-  glTexBufferEXT(GL_TEXTURE_BUFFER_EXT, GL_RGBA32F_ARB, m_glAABBNodeBuf[0]);
-  glBindTexture(GL_TEXTURE_BUFFER_EXT, m_glAABBLeafTB[1]);
-  glTexBufferEXT(GL_TEXTURE_BUFFER_EXT, GL_RGBA32F_ARB, m_glAABBNodeBuf[1]);
-  glBindBuffer(GL_TEXTURE_BUFFER_EXT, 0);
-  glBindTexture(GL_TEXTURE_BUFFER_EXT, 0);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBNodeTB[0]);
+  glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F_ARB, m_glAABBNodeBuf[0]);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBNodeTB[1]);
+  glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F_ARB, m_glAABBNodeBuf[1]);
+  glBindBuffer(GL_TEXTURE_BUFFER, 0);
+  glBindTexture(GL_TEXTURE_BUFFER, 0);
+  CHECK_FOR_OGL_ERROR();
+
+
+
+  // Create buffer for internal node children indices
+  // For each internal node (m_nElements - 1) left and right child index
+  glGenBuffers(1, &m_glNodeChildsBuf);
+  glBindBuffer(GL_ARRAY_BUFFER, m_glNodeChildsBuf);
+  glBufferData(GL_ARRAY_BUFFER, m_nElements * sizeof(cl_uint2), NULL, GL_DYNAMIC_DRAW);
+  CHECK_FOR_OGL_ERROR();
+
+  // Create texture buffer
+  glGenTextures(1, &m_glNodeChildsTB);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glNodeChildsTB);
+  glTexBuffer(GL_TEXTURE_BUFFER, GL_RG32UI, m_glNodeChildsTB);
+  glBindBuffer(GL_TEXTURE_BUFFER, 0);
+  glBindTexture(GL_TEXTURE_BUFFER, 0);
+  CHECK_FOR_OGL_ERROR();
+
+  // Create buffer for node parent indices
+  // For each internal node (m_nElements - 1) + each leaf node (m_nElements) parent index
+  glGenBuffers(1, &m_glNodeParentsBuf);
+  glBindBuffer(GL_ARRAY_BUFFER, m_glNodeParentsBuf);
+  glBufferData(GL_ARRAY_BUFFER, 2 * m_nElements * sizeof(cl_uint), NULL, GL_DYNAMIC_DRAW);
+  CHECK_FOR_OGL_ERROR();
+
+  // Create texture buffer
+  glGenTextures(1, &m_glNodeParentsTB);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glNodeParentsTB);
+  glTexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, m_glNodeParentsTB);
+  glBindBuffer(GL_TEXTURE_BUFFER, 0);
+  glBindTexture(GL_TEXTURE_BUFFER, 0);
   CHECK_FOR_OGL_ERROR();
 
 
@@ -290,7 +336,6 @@ bool CCreateBVH::InitGL() {
   m_PSParticles = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
 
   if (!CreateShaderFromFile("particles.vert", m_VSParticles)) return false;
-
   if (!CreateShaderFromFile("particles.frag", m_PSParticles)) return false;
 
   m_ProgRenderParticles = glCreateProgramObjectARB();
@@ -298,10 +343,15 @@ bool CCreateBVH::InitGL() {
   glAttachObjectARB(m_ProgRenderParticles, m_PSParticles);
   if (!LinkGLSLProgram(m_ProgRenderParticles)) return false;
 
-  GLint tboSampler = glGetUniformLocationARB(m_ProgRenderParticles, "tboSampler");
+  GLint tboSampler = glGetUniformLocationARB(m_ProgRenderParticles, "AABBmin");
   glUseProgramObjectARB(m_ProgRenderParticles);
   glUniform1i(tboSampler, 0);
+  tboSampler = glGetUniformLocationARB(m_ProgRenderParticles, "AABBmax");
+  glUseProgramObjectARB(m_ProgRenderParticles);
+  glUniform1i(tboSampler, 1);
+  CHECK_FOR_OGL_ERROR();
 
+  aabbminmax = glGetUniformLocationARB(m_ProgRenderParticles, "aabbminmax");
 
 
   // set the modelview matrix
@@ -359,20 +409,36 @@ void CCreateBVH::ComputeGPU(cl_context Context, cl_command_queue CommandQueue, s
   (void)LocalWorkSize;
 
 
-
   glFinish();
   V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
   V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
 
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeChilds, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeParents, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+
   // DO THE CL STUFF HERE
 
+  // move the center points 
   AdvancePositions(Context, CommandQueue, m_clPositions, m_clVelocities);
+
+  // Creates leaf node AABBs, reduces them to morton AABB, calculates Morton Codes from the morton AABB
+  MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+  // Sort morton codes and create permutation array
+  RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
+  // Permute the center positions and velocities using the permutation from radix sort
+  Permute(Context, CommandQueue, &m_clPositions, m_clSortPermutation);
+  Permute(Context, CommandQueue, &m_clVelocities, m_clSortPermutation);
+
+  // Create leaf node AABBs again (their memory was used as temp memory during the morton AABB reduction)
   CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, m_clPositions);
 
 
 
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
+
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeChilds, 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeParents, 0, NULL, NULL), "Error releasing OpenGL buffer.");
 
   clFinish(CommandQueue);
 }
@@ -881,6 +947,12 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
       res = mortoncodessort[i] == mortoncodes[permutation[i]];
       if (!res) break;
     }
+    std::set<cl_uint> ids;
+    for (size_t i = 0; i < m_nElements; ++i) {
+      res = 0 <= permutation[i] && permutation[i] < m_nElements && ids.find(permutation[i]) == ids.end();
+      ids.insert(permutation[i]);
+      if (!res) break;
+    }
 
     print_info("RADIX SORT", timecpu, timegpu, res);
   }
@@ -904,7 +976,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     timecpu = timer.GetElapsedMilliseconds();
 
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) Permute(Context, CommandQueue, m_clPermuteTemp, m_clPositions, m_clSortPermutation);
+    for (size_t i = 0; i < 100; ++i) Permute(Context, CommandQueue, &m_clPositions, m_clSortPermutation);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
@@ -912,8 +984,8 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
     RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
-    Permute(Context, CommandQueue, m_clPermuteTemp, m_clPositions, m_clSortPermutation);
-    swap(m_clPermuteTemp, m_clPositions);
+    Permute(Context, CommandQueue, &m_clPositions, m_clSortPermutation);
+    Permute(Context, CommandQueue, &m_clVelocities, m_clSortPermutation);
 
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clPositions, CL_TRUE, 0, m_nElements * sizeof(cl_float4), positionssort.data(), 0, NULL, NULL),
                 "Error reading data from device!");
@@ -1105,6 +1177,8 @@ void CCreateBVH::ReorderKeys(cl_context Context, cl_command_queue CommandQueue, 
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 }
 void CCreateBVH::RadixSort(cl_context Context, cl_command_queue CommandQueue, cl_mem keys, cl_mem permutation) {
+  PermutationIdentity(Context, CommandQueue, permutation);
+
   cl_mem keyspingpong[2] = {keys, m_clRadixKeysPong};
   cl_mem permutationpingpong[2] = {permutation, m_clRadixPermutationPong};
 
@@ -1129,19 +1203,21 @@ void CCreateBVH::RadixSort(cl_context Context, cl_command_queue CommandQueue, cl
                 m_clRadixOneBit, mask);
   }
 }
-void CCreateBVH::Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem to, cl_mem from, cl_mem permutation) {
+void CCreateBVH::Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem *target, cl_mem permutation) {
   cl_int clErr;
   // We need as many work items as elements
   size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
 
-  clErr = clSetKernelArg( m_PermuteKernel, 0, sizeof(cl_mem), (void*)&to);
-  clErr |= clSetKernelArg(m_PermuteKernel, 1, sizeof(cl_mem), (void*)&from);
+  clErr = clSetKernelArg( m_PermuteKernel, 0, sizeof(cl_mem), (void*)&m_clPermuteTemp);
+  clErr |= clSetKernelArg(m_PermuteKernel, 1, sizeof(cl_mem), (void*)target);
   clErr |= clSetKernelArg(m_PermuteKernel, 2, sizeof(cl_mem), (void*)&permutation);
   clErr |= clSetKernelArg(m_PermuteKernel, 3, sizeof(cl_uint), (void*)&m_nElements);
   V_RETURN_CL(clErr, "Error setting kernel arguments.");
 
   clErr = clEnqueueNDRangeKernel(CommandQueue, m_PermuteKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+
+  swap(m_clPermuteTemp, *target);
 }
 
 
@@ -1201,17 +1277,17 @@ void CCreateBVH::Render() {
   // Render point sprites...
   //
 
-  glEnable(GL_POINT_SPRITE_ARB);
 
-  glBindBuffer(GL_ARRAY_BUFFER, m_glAABBLeafBuf[1]);
-  glVertexPointer(4, GL_FLOAT, 0, 0);
-  glEnableClientState(GL_VERTEX_ARRAY);
-  glColor4f(1.0, 0.0, 0.0, 0.3f);
-  glDrawArrays(GL_POINTS, 0, m_nElements);
-  glDisableClientState(GL_VERTEX_ARRAY);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[0]);
 
-  glDisable(GL_POINT_SPRITE_ARB);
-  glBindTexture(GL_TEXTURE_BUFFER_EXT, 0);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[1]);
+
+  glUniform1i(aabbminmax, 1);
+  glDrawArraysInstanced(GL_LINES, 0, 24, m_nElements);
+
+  glBindTexture(GL_TEXTURE_BUFFER, 0);
 }
 
 void CCreateBVH::OnKeyboard(int Key, int Action) {
@@ -1257,8 +1333,8 @@ void CCreateBVH::OnMouseMove(int X, int Y) {
 
 void CCreateBVH::OnIdle(double, float ElapsedTime) {
   // move camera?
-  if (m_KeyboardMask[GLFW_KEY_W]) m_TranslateZ += 2.f * ElapsedTime;
-  if (m_KeyboardMask[GLFW_KEY_S]) m_TranslateZ -= 2.f * ElapsedTime;
+  if (m_KeyboardMask[GLFW_KEY_W]) m_TranslateZ += 10.f * ElapsedTime;
+  if (m_KeyboardMask[GLFW_KEY_S]) m_TranslateZ -= 10.f * ElapsedTime;
 
   if (m_TranslateZ > 0) m_TranslateZ = 0;
 

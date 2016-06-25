@@ -3,9 +3,9 @@
 
 __kernel void ReduceAABBmin(__global float4* AABBs, uint N, uint stride) {
   int pos = get_global_id(0);
+  if (pos >= N) return;
 
-  float4 minv;
-  if (pos < N) minv = AABBs[pos];
+  float4 minv = AABBs[pos];
   if (pos + stride < N) minv = min(minv, AABBs[pos + stride]);
 
   AABBs[pos] = minv;
@@ -13,9 +13,9 @@ __kernel void ReduceAABBmin(__global float4* AABBs, uint N, uint stride) {
 
 __kernel void ReduceAABBmax(__global float4* AABBs, uint N, uint stride) {
   int pos = get_global_id(0);
+  if (pos >= N) return;
 
-  float4 minv;
-  if (pos < N) minv = AABBs[pos];
+  float4 minv = AABBs[pos];
   if (pos + stride < N) minv = max(minv, AABBs[pos + stride]);
 
   AABBs[pos] = minv;

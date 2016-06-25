@@ -1,3 +1,7 @@
+
+in vec4 col;
+
+
 void main()
 {
 	//gl_FragColor = vec4(1.0f, 1.0f, 0.0f, 1.0f);
@@ -8,8 +12,7 @@ void main()
 	//attenuation function
 	float alpha = (0.5f - distance * distance / 0.5f) * 1.f;
 	
-	gl_FragColor = gl_Color;
-	gl_FragColor.w = alpha;
+	gl_FragColor = col;
 	
 	//gl_FragColor = vec4(gl_TexCoord[0].x, gl_TexCoord[0].y, 1.0f, alpha);
 }
