@@ -43,12 +43,9 @@ int traverse(int level) {
 
 void main() {
 
-  //int node = traverse(level);
-  ivec2 children = ivec2(texelFetchBuffer(Children, 0).xy);
+  int node = traverse(level);
 
-  int node = children.x;
-  if (gl_InstanceID == 0)
-    node = children.y;
+  if (hi == 0) node = gl_InstanceID + N;
 
 	vec3 c000 = texelFetchBuffer(AABBmin, node).xyz;
 	vec3 c111 = texelFetchBuffer(AABBmax, node).xyz;
@@ -105,8 +102,7 @@ void main() {
     
 
   col = vec4(0,1,0,1);
-  //if (hi == 1)
-  if (gl_InstanceID == 0)
+  if (hi == 1)
     col = vec4(1,0,0,1);
 
   gl_Position = gl_ModelViewProjectionMatrix * vec4(v, 1);

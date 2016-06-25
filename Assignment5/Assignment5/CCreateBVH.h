@@ -180,7 +180,7 @@ protected:
   GLint displaylevel;
   GLint hi;
   GLint dlevel = 0;
-
+  bool showleaves = false;
 
   std::string m_CollisionMeshPath;
 

@@ -1374,13 +1374,19 @@ void CCreateBVH::Render() {
   glActiveTexture(GL_TEXTURE2);
   glBindTexture(GL_TEXTURE_BUFFER, m_glNodeChildrenGLTB);
 
+  glDisable(GL_DEPTH_TEST);
+
+  if (showleaves) {
+    glLineWidth(1);
+    glUniform1i(hi, 0);
+    glDrawArraysInstanced(GL_LINES, 0, 24, m_nElements);
+  }
+
+  glLineWidth(2);
   glUniform1i(displaylevel, dlevel);
   glUniform1i(hi, 1);
   glDrawArraysInstanced(GL_LINES, 0, 24, m_nElements);
 
-  glUniform1i(displaylevel, dlevel + 1);
-  glUniform1i(hi, 0);
-  glDrawArraysInstanced(GL_LINES, 0, 24, m_nElements);
 
   glBindTexture(GL_TEXTURE_BUFFER, 0);
 }
@@ -1446,6 +1452,14 @@ void CCreateBVH::OnIdle(double, float ElapsedTime) {
     cout << dlevel << endl;
   }
   if (!m_KeyboardMask[GLFW_KEY_K]) pressK = false;
+
+  static bool pressL = false;
+  if (!pressL && m_KeyboardMask[GLFW_KEY_L]) {
+    pressL = true;
+    showleaves = !showleaves;
+  }
+  if (!m_KeyboardMask[GLFW_KEY_L]) pressL = false;
+
 
   if (m_TranslateZ > 0) m_TranslateZ = 0;
 
