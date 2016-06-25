@@ -20,7 +20,7 @@ GPU Computing / GPGPU Praktikum source code.
 #endif
 
 
-#define BUILD_PERF_TEST
+//#define BUILD_PERF_TEST
 
 
 using namespace std;

@@ -93,3 +93,46 @@ __kernel void NodesHierarchy(__global uint2* childnodes, __global uint* parents,
   parents[leftChild] = GID;
   parents[rightChild] = GID;
 }
+
+__kernel void InnerAABBs(__global float4* AABBmin, __global float4* AABBmax, __global uint2* children, __global uint* parents, __global int* flags, uint N) {
+  int GID = get_global_id(0);
+  if (GID >= N) return;
+
+  int node = parents[GID + N];
+
+  while (node != 0) {
+    if (atomic_inc(&flags[node]) == 1) {
+      uint2 c = children[node];
+      float4 mi_l = AABBmin[c.x];
+      float4 ma_l = AABBmax[c.x];
+      float4 mi_r = AABBmin[c.y];
+      float4 ma_r = AABBmax[c.y];
+
+      float4 mi_n = min(mi_l, mi_r);
+      float4 ma_n = max(ma_l, ma_r);
+
+      AABBmin[node] = mi_n;
+      AABBmax[node] = ma_n;
+    }
+    else return;
+
+    node = parents[node];
+  }
+
+}
+
+__kernel void InitFlags(__global int* flags, uint N) {
+  int GID = get_global_id(0);
+  if (GID >= N) return;
+  flags[GID] = 0;
+}
+
+
+__kernel void CopyChildnodes(__global float2* childnodesGL, const __global uint2* childnodes, uint N) {
+  int GID = get_global_id(0);
+
+  if (GID >= N) return;
+
+  uint2 c = childnodes[GID];
+  childnodesGL[GID] = (float2)(c.x, c.y);
+}

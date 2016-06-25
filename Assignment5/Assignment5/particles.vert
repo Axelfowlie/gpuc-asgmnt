@@ -3,7 +3,13 @@
 uniform samplerBuffer AABBmin;
 uniform samplerBuffer AABBmax;
 
-uniform int aabbminmax;
+uniform samplerBuffer Children;
+
+uniform int hi;
+uniform int level;
+uniform int N;
+
+varying vec4 col;
 
 vec4 colorCode(float value)
 {
@@ -18,12 +24,34 @@ vec4 colorCode(float value)
 	return retVal;
 }
 
-varying vec4 col;
+
+int traverse(int level) {
+  int node = 0;
+  int c = 0;
+  while (node < N && c < level) {
+    ivec2 children = ivec2(texelFetchBuffer(Children, node).xy);
+    if (gl_InstanceID <= children.x)
+      node = children.x;
+    else
+      node = children.y;
+    ++c;
+  }
+  return node;
+}
+
+
 
 void main() {
 
-	vec3 c000 = texelFetchBuffer(AABBmin, gl_InstanceID).xyz;
-	vec3 c111 = texelFetchBuffer(AABBmax, gl_InstanceID).xyz;
+  //int node = traverse(level);
+  ivec2 children = ivec2(texelFetchBuffer(Children, 0).xy);
+
+  int node = children.x;
+  if (gl_InstanceID == 0)
+    node = children.y;
+
+	vec3 c000 = texelFetchBuffer(AABBmin, node).xyz;
+	vec3 c111 = texelFetchBuffer(AABBmax, node).xyz;
 
   vec3 size = c111 - c000;
 
@@ -77,5 +105,9 @@ void main() {
     
 
   col = vec4(0,1,0,1);
+  //if (hi == 1)
+  if (gl_InstanceID == 0)
+    col = vec4(1,0,0,1);
+
   gl_Position = gl_ModelViewProjectionMatrix * vec4(v, 1);
 }

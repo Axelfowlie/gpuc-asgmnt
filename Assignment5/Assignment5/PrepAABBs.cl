@@ -23,7 +23,7 @@ __kernel void AdvancePositions(__global float4* positions, __global float4* velo
 
 
 
-__kernel void CreateLeafAABBs(const __global float4* positions, __global float4* AABBmin, __global float4* AABBmax, uint N) {
+__kernel void CreateLeafAABBs(const __global float4* positions, __global float4* AABBmin, __global float4* AABBmax, uint N, uint offset) {
   int GID = get_global_id(0);
   if (GID >= N) return;
 
@@ -31,6 +31,6 @@ __kernel void CreateLeafAABBs(const __global float4* positions, __global float4*
 
   float4 size = (float4)(pos.w, pos.w, pos.w, pos.w) / 2;
 
-  AABBmin[GID] = pos - size;
-  AABBmax[GID] = pos + size;
+  AABBmin[offset + GID] = pos - size;
+  AABBmax[offset + GID] = pos + size;
 }

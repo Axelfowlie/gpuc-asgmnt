@@ -54,7 +54,7 @@ public:
 
   void AdvancePositions(cl_context Context, cl_command_queue CommandQueue, cl_mem positions, cl_mem velocities);
 
-  void CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs[2], cl_mem positions);
+  void CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs[2], cl_mem positions, cl_uint offset);
   void ReduceAABB(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs, cl_kernel Kernel);
   void MortonCodeAABB(cl_context Context, cl_command_queue CommandQueue, cl_mem mortonaabb, cl_mem aabbs[2], cl_mem positions);
   void MortonCodes(cl_context Context, cl_command_queue CommandQueue, cl_mem codes, cl_mem mortonaabb, cl_mem aabbs[2], cl_mem positions);
@@ -68,6 +68,8 @@ public:
   void Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem *from, cl_mem permutation);
 
   void CreateHierarchy(cl_context Context, cl_command_queue CommandQueue, cl_mem children, cl_mem parents, cl_mem mortoncodes);
+  void InnerNodeAABBs(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs[2], cl_mem children, cl_mem parents, cl_mem flags);
+  void CopyChildnodes(cl_context Context, cl_command_queue CommandQueue, cl_mem childrenGL, cl_mem children);
 
 
   // Not implemented!
@@ -102,24 +104,22 @@ protected:
   cl_mem m_clVelocities = nullptr;
   // AABBs for leaf and inner nodes
   // Each one as two float4 arrays, [0] for the minimum and [1] for the maximum
-  cl_mem m_clAABBLeaves[2] = {nullptr, nullptr};
-  cl_mem m_clAABBNodes[2] = {nullptr, nullptr};
+  cl_mem m_clAABBs[2] = {nullptr, nullptr};
   // Buffer to hold the AABB to calculate the Morton codes
   cl_mem m_clMortonAABB = nullptr;
   // AABBs shall be displayed using wireframe boxes
-  GLuint m_glAABBLeafBuf[2] = { 0, 0 };
-  GLuint m_glAABBLeafTB[2] = { 0, 0 };
-  GLuint m_glAABBNodeBuf[2] = { 0, 0 };
-  GLuint m_glAABBNodeTB[2] = { 0, 0 };
+  GLuint m_glAABBsBuf[2] = { 0, 0 };
+  GLuint m_glAABBsTB[2] = { 0, 0 };
 
   // One buffer to index the left and right child for each internal node
   cl_mem m_clNodeChildren = nullptr;
-  GLuint m_glNodeChildrenBuf = 0;
-  GLuint m_glNodeChildrenTB = 0;
+  cl_mem m_clNodeChildrenGL = nullptr;
+  GLuint m_glNodeChildrenGLBuf = 0;
+  GLuint m_glNodeChildrenGLTB = 0;
   // One buffer to index the parent for each nodes
   cl_mem m_clNodeParents = nullptr;
-  GLuint m_glNodeParentsBuf = 0;
-  GLuint m_glNodeParentsTB = 0;
+  // flags for calculating the inner node's AABBs
+  cl_mem m_clInnerAABBFlags = nullptr;
 
   
   // Kernels to advance centerpositions and create the leaf node AABBs
@@ -135,6 +135,9 @@ protected:
   // Kernels for creating the parent-child node relationships
   cl_program m_BVHNodesProgram = nullptr;
   cl_kernel m_NodesHierarchyKernel = nullptr;
+  cl_kernel m_clInitAABBFlags = nullptr;
+  cl_kernel m_clInnerAABBsKernel = nullptr;
+  cl_kernel m_CopyChildnodesKernel = nullptr;
 
 
   // RADIX SORT
@@ -174,7 +177,9 @@ protected:
   //
   //
 
-  GLint aabbminmax;
+  GLint displaylevel;
+  GLint hi;
+  GLint dlevel = 0;
 
 
   std::string m_CollisionMeshPath;

@@ -123,19 +123,19 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
 
 
   // Create buffers for AABB leafs and inner nodes from open gl buffers
-  m_clAABBLeaves[0] = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glAABBLeafBuf[0], &clError);
-  m_clAABBLeaves[1] = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glAABBLeafBuf[1], &clError);
-  V_RETURN_FALSE_CL(clError, "Failed to create AABBLeaves buffer.");
-  m_clAABBNodes[0] = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glAABBNodeBuf[0], &clError);
-  m_clAABBNodes[1] = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glAABBNodeBuf[1], &clError);
-  V_RETURN_FALSE_CL(clError, "Failed to create AABBNodes buffer.");
+  m_clAABBs[0] = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glAABBsBuf[0], &clError);
+  m_clAABBs[1] = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glAABBsBuf[1], &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create AABBs buffer.");
 
   m_clMortonAABB = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_float4) * 2, NULL, &clError);
   V_RETURN_FALSE_CL(clError, "Failed to create MortonAABB buffer.");
 
   // Create buffers for internal node's children and parents indices
-  m_clNodeChildren = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glNodeChildrenBuf, &clError);
-  m_clNodeParents = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glNodeParentsBuf, &clError);
+  m_clNodeChildren = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint2) * m_nElements, NULL, &clError);
+  m_clNodeChildrenGL = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glNodeChildrenGLBuf, &clError);
+  m_clNodeParents = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_uint) * m_nElements * 2, NULL, &clError);
+
+  m_clInnerAABBFlags = clCreateBuffer(Context, CL_MEM_READ_WRITE, sizeof(cl_int) * m_nElements, NULL, &clError);
   V_RETURN_FALSE_CL(clError, "Failed to create internal nodes buffer.");
 
 
@@ -174,6 +174,12 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
 
   m_NodesHierarchyKernel = clCreateKernel(m_BVHNodesProgram, "NodesHierarchy", &clError);
   V_RETURN_FALSE_CL(clError, "Failed to create NodesHierarchy kernel.");
+  m_clInitAABBFlags = clCreateKernel(m_BVHNodesProgram, "InitFlags", &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create Flags kernel.");
+  m_clInnerAABBsKernel = clCreateKernel(m_BVHNodesProgram, "InnerAABBs", &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create InnerAABBs kernel.");
+  m_CopyChildnodesKernel = clCreateKernel(m_BVHNodesProgram, "CopyChildnodes", &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create CopyChildnodes kernel.");
 
   //
   //
@@ -252,70 +258,35 @@ bool CCreateBVH::InitGL() {
 
 
   // Create buffers for leaf node AABBs
-  glGenBuffers(2, m_glAABBLeafBuf);
-  glBindBuffer(GL_ARRAY_BUFFER, m_glAABBLeafBuf[0]);
-  glBufferData(GL_ARRAY_BUFFER, m_nElements * sizeof(cl_float4), NULL, GL_DYNAMIC_DRAW);
-  glBindBuffer(GL_ARRAY_BUFFER, m_glAABBLeafBuf[1]);
-  glBufferData(GL_ARRAY_BUFFER, m_nElements * sizeof(cl_float4), NULL, GL_DYNAMIC_DRAW);
+  glGenBuffers(2, m_glAABBsBuf);
+  glBindBuffer(GL_TEXTURE_BUFFER, m_glAABBsBuf[0]);
+  glBufferData(GL_TEXTURE_BUFFER, 2 * m_nElements * sizeof(cl_float4), NULL, GL_DYNAMIC_DRAW);
+  glBindBuffer(GL_TEXTURE_BUFFER, m_glAABBsBuf[1]);
+  glBufferData(GL_TEXTURE_BUFFER, 2 * m_nElements * sizeof(cl_float4), NULL, GL_DYNAMIC_DRAW);
   CHECK_FOR_OGL_ERROR();
 
   // Create texture buffers
-  glGenTextures(2, m_glAABBLeafTB);
-  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[0]);
-  glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F_ARB, m_glAABBLeafBuf[0]);
-  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[1]);
-  glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F_ARB, m_glAABBLeafBuf[1]);
+  glGenTextures(2, m_glAABBsTB);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBsTB[0]);
+  glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F_ARB, m_glAABBsBuf[0]);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBsTB[1]);
+  glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F_ARB, m_glAABBsBuf[1]);
   glBindBuffer(GL_TEXTURE_BUFFER, 0);
   glBindTexture(GL_TEXTURE_BUFFER, 0);
   CHECK_FOR_OGL_ERROR();
-
-
-  // Create buffers for inner node AABBs
-  glGenBuffers(2, m_glAABBNodeBuf);
-  glBindBuffer(GL_ARRAY_BUFFER, m_glAABBNodeBuf[0]);
-  glBufferData(GL_ARRAY_BUFFER, m_nElements * sizeof(cl_float4), NULL, GL_DYNAMIC_DRAW);
-  glBindBuffer(GL_ARRAY_BUFFER, m_glAABBNodeBuf[1]);
-  glBufferData(GL_ARRAY_BUFFER, m_nElements * sizeof(cl_float4), NULL, GL_DYNAMIC_DRAW);
-  CHECK_FOR_OGL_ERROR();
-
-  // Create texture buffers
-  glGenTextures(2, m_glAABBNodeTB);
-  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBNodeTB[0]);
-  glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F_ARB, m_glAABBNodeBuf[0]);
-  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBNodeTB[1]);
-  glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F_ARB, m_glAABBNodeBuf[1]);
-  glBindBuffer(GL_TEXTURE_BUFFER, 0);
-  glBindTexture(GL_TEXTURE_BUFFER, 0);
-  CHECK_FOR_OGL_ERROR();
-
 
 
   // Create buffer for internal node children indices
   // For each internal node (m_nElements - 1) left and right child index
-  glGenBuffers(1, &m_glNodeChildrenBuf);
-  glBindBuffer(GL_ARRAY_BUFFER, m_glNodeChildrenBuf);
-  glBufferData(GL_ARRAY_BUFFER, m_nElements * sizeof(cl_uint2), NULL, GL_DYNAMIC_DRAW);
+  glGenBuffers(1, &m_glNodeChildrenGLBuf);
+  glBindBuffer(GL_TEXTURE_BUFFER, m_glNodeChildrenGLBuf);
+  glBufferData(GL_TEXTURE_BUFFER, m_nElements * sizeof(cl_float2), NULL, GL_DYNAMIC_DRAW);
   CHECK_FOR_OGL_ERROR();
 
   // Create texture buffer
-  glGenTextures(1, &m_glNodeChildrenTB);
-  glBindTexture(GL_TEXTURE_BUFFER, m_glNodeChildrenTB);
-  glTexBuffer(GL_TEXTURE_BUFFER, GL_RG32UI, m_glNodeChildrenTB);
-  glBindBuffer(GL_TEXTURE_BUFFER, 0);
-  glBindTexture(GL_TEXTURE_BUFFER, 0);
-  CHECK_FOR_OGL_ERROR();
-
-  // Create buffer for node parent indices
-  // For each internal node (m_nElements - 1) + each leaf node (m_nElements) parent index
-  glGenBuffers(1, &m_glNodeParentsBuf);
-  glBindBuffer(GL_ARRAY_BUFFER, m_glNodeParentsBuf);
-  glBufferData(GL_ARRAY_BUFFER, 2 * m_nElements * sizeof(cl_uint), NULL, GL_DYNAMIC_DRAW);
-  CHECK_FOR_OGL_ERROR();
-
-  // Create texture buffer
-  glGenTextures(1, &m_glNodeParentsTB);
-  glBindTexture(GL_TEXTURE_BUFFER, m_glNodeParentsTB);
-  glTexBuffer(GL_TEXTURE_BUFFER, GL_R32UI, m_glNodeParentsTB);
+  glGenTextures(1, &m_glNodeChildrenGLTB);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glNodeChildrenGLTB);
+  glTexBuffer(GL_TEXTURE_BUFFER, GL_RG32F, m_glNodeChildrenGLBuf);
   glBindBuffer(GL_TEXTURE_BUFFER, 0);
   glBindTexture(GL_TEXTURE_BUFFER, 0);
   CHECK_FOR_OGL_ERROR();
@@ -352,9 +323,18 @@ bool CCreateBVH::InitGL() {
   tboSampler = glGetUniformLocationARB(m_ProgRenderParticles, "AABBmax");
   glUseProgramObjectARB(m_ProgRenderParticles);
   glUniform1i(tboSampler, 1);
+  tboSampler = glGetUniformLocationARB(m_ProgRenderParticles, "Children");
+  glUseProgramObjectARB(m_ProgRenderParticles);
+  glUniform1i(tboSampler, 2);
+
+  GLint n = glGetUniformLocationARB(m_ProgRenderParticles, "N");
+  glUniform1i(n, m_nElements);
+
+  displaylevel = glGetUniformLocationARB(m_ProgRenderParticles, "level");
+  hi = glGetUniformLocationARB(m_ProgRenderParticles, "hi");
   CHECK_FOR_OGL_ERROR();
 
-  aabbminmax = glGetUniformLocationARB(m_ProgRenderParticles, "aabbminmax");
+
 
 
   // set the modelview matrix
@@ -413,11 +393,10 @@ void CCreateBVH::ComputeGPU(cl_context Context, cl_command_queue CommandQueue, s
 
 
   glFinish();
-  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
-  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBs[0], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBs[1], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
 
-  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeChildren, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
-  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeParents, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeChildrenGL, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
 
   // DO THE CL STUFF HERE
 
@@ -425,23 +404,27 @@ void CCreateBVH::ComputeGPU(cl_context Context, cl_command_queue CommandQueue, s
   AdvancePositions(Context, CommandQueue, m_clPositions, m_clVelocities);
 
   // Creates leaf node AABBs, reduces them to morton AABB, calculates Morton Codes from the morton AABB
-  MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+  MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
   // Sort morton codes and create permutation array
   RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
   // Permute the center positions and velocities using the permutation from radix sort
   Permute(Context, CommandQueue, &m_clPositions, m_clSortPermutation);
   Permute(Context, CommandQueue, &m_clVelocities, m_clSortPermutation);
 
+  CreateHierarchy(Context, CommandQueue, m_clNodeChildren, m_clNodeParents, m_clMortonCodes);
+
   // Create leaf node AABBs again (their memory was used as temp memory during the morton AABB reduction)
-  CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, m_clPositions);
+  CreateLeafAABBs(Context, CommandQueue, m_clAABBs, m_clPositions, m_nElements);
+  InnerNodeAABBs(Context, CommandQueue, m_clAABBs, m_clNodeChildren, m_clNodeParents, m_clInnerAABBFlags);
+
+  CopyChildnodes(Context, CommandQueue, m_clNodeChildrenGL, m_clNodeChildren);
 
 
 
-  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
-  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBs[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBs[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
 
-  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeChildren, 0, NULL, NULL), "Error releasing OpenGL buffer.");
-  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeParents, 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeChildrenGL, 0, NULL, NULL), "Error releasing OpenGL buffer.");
 
   clFinish(CommandQueue);
 }
@@ -549,10 +532,9 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   cout << "Running performance test..." << endl
        << endl;
   glFinish();
-  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
-  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
-  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeChildren, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
-  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeParents, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBs[0], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBs[1], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeChildrenGL, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
 
   CTimer timer;
   double timecpu, timegpu;
@@ -610,14 +592,14 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Time for GPU
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, m_clPositions);
+    for (size_t i = 0; i < 100; ++i) CreateLeafAABBs(Context, CommandQueue, m_clAABBs, m_clPositions, 0);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clAABBLeaves[0], CL_TRUE, 0, m_nElements * sizeof(cl_float4), leafaabbmin.data(), 0, NULL, NULL),
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clAABBs[0], CL_TRUE, 0, m_nElements * sizeof(cl_float4), leafaabbmin.data(), 0, NULL, NULL),
                 "Error reading data from device!");
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clAABBLeaves[1], CL_TRUE, 0, m_nElements * sizeof(cl_float4), leafaabbmax.data(), 0, NULL, NULL),
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clAABBs[1], CL_TRUE, 0, m_nElements * sizeof(cl_float4), leafaabbmax.data(), 0, NULL, NULL),
                 "Error reading data from device!");
     res = memcmp(leafaabbmin.data(), leafaabbmin_cpu.data(), leafaabbmin.size() * sizeof(cl_float4)) == 0 &&
           memcmp(leafaabbmax.data(), leafaabbmax_cpu.data(), leafaabbmax.size() * sizeof(cl_float4)) == 0;
@@ -630,10 +612,10 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // #############
   if (res) {
     // input AABBs from gpu
-    CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, m_clPositions);
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clAABBLeaves[0], CL_TRUE, 0, m_nElements * sizeof(cl_float4), leafaabbmin.data(), 0, NULL, NULL),
+    CreateLeafAABBs(Context, CommandQueue, m_clAABBs, m_clPositions, 0);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clAABBs[0], CL_TRUE, 0, m_nElements * sizeof(cl_float4), leafaabbmin.data(), 0, NULL, NULL),
                 "Error reading data from device!");
-    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clAABBLeaves[1], CL_TRUE, 0, m_nElements * sizeof(cl_float4), leafaabbmax.data(), 0, NULL, NULL),
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clAABBs[1], CL_TRUE, 0, m_nElements * sizeof(cl_float4), leafaabbmax.data(), 0, NULL, NULL),
                 "Error reading data from device!");
     // Time CPU
     timer.Start();
@@ -661,13 +643,13 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Time for GPU
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    for (size_t i = 0; i < 100; ++i) MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBs, m_clPositions);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
     // Verify results
-    MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBs, m_clPositions);
 
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonAABB, CL_TRUE, 0, sizeof(cl_float4) * 2, mortonaabb.data(), 0, NULL, NULL),
                 "Error reading data from device!");
@@ -682,8 +664,8 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // #############
   if (res) {
     // Input morton AABB from gpu
-    CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, m_clPositions);
-    MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    CreateLeafAABBs(Context, CommandQueue, m_clAABBs, m_clPositions, 0);
+    MortonCodeAABB(Context, CommandQueue, m_clMortonAABB, m_clAABBs, m_clPositions);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonAABB, CL_TRUE, 0, sizeof(cl_float4) * 2, mortonaabb.data(), 0, NULL, NULL),
                 "Error reading data from device!");
 
@@ -706,7 +688,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Time for GPU
     timer.Start();
-    for (size_t i = 0; i < 100; ++i) MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    for (size_t i = 0; i < 100; ++i) MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
@@ -732,7 +714,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
     // Verify results
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
 
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
                 "Error reading data from device!");
@@ -783,7 +765,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // #############
   if (res) {
     // Input morton codes from gpu
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
                 "Error reading data from device!");
 
@@ -803,7 +785,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     timecpu = timer.GetElapsedMilliseconds();
 
     // Time for GPU
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
 
     timer.Start();
     for (size_t i = 0; i < 100; ++i) SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
@@ -812,7 +794,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
     // Validate correctness
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), zeroflags.data(), 0, NULL, NULL),
                 "Error reading data from device!");
@@ -834,7 +816,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // #############
   if (res) {
     // Input flags from gpu
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixZeroBit, CL_TRUE, 0, m_nElements * sizeof(cl_uint), zeroflags_cpu.data(), 0, NULL, NULL),
                 "Error reading data from device!");
@@ -853,7 +835,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Time for GPU
     // Initialize buffers for scan with result from SelectBitflag
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
 
     timer.Start();
@@ -864,7 +846,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
     // Validate correctness
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     Scan(Context, CommandQueue, m_clRadixZeroBit);
     Scan(Context, CommandQueue, m_clRadixOneBit);
@@ -900,7 +882,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // #############
   if (res) {
     // Input bit flag prefix sums from gpu
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     Scan(Context, CommandQueue, m_clRadixZeroBit);
     Scan(Context, CommandQueue, m_clRadixOneBit);
@@ -934,7 +916,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
 
     // Time for GPU
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     Scan(Context, CommandQueue, m_clRadixZeroBit);
     Scan(Context, CommandQueue, m_clRadixOneBit);
@@ -949,7 +931,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
 
     // Validate correctness
     PermutationIdentity(Context, CommandQueue, m_clSortPermutation);
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     Scan(Context, CommandQueue, m_clRadixZeroBit);
     Scan(Context, CommandQueue, m_clRadixOneBit);
@@ -978,7 +960,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // RADIX SORT
   // #############
   if (res) {
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodessort_cpu.data(), 0, NULL, NULL),
                 "Error reading data from device!");
     timer.Start();
@@ -1020,7 +1002,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // PERMUTE
   // #############
   if (res) {
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clPositions, CL_TRUE, 0, m_nElements * sizeof(cl_float4), positions.data(), 0, NULL, NULL),
                 "Error reading data from device!");
@@ -1040,7 +1022,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
 
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
     Permute(Context, CommandQueue, &m_clPositions, m_clSortPermutation);
     Permute(Context, CommandQueue, &m_clVelocities, m_clSortPermutation);
@@ -1059,7 +1041,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   // PERMUTE
   // #############
   if (res) {
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
                 "Error reading data from device!");
@@ -1076,7 +1058,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
 
 
-    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBs, m_clPositions);
     RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
 
     CreateHierarchy(Context, CommandQueue, m_clNodeChildren, m_clNodeParents, m_clMortonCodes);
@@ -1094,10 +1076,9 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     print_info("NODE HIERARCHY", timecpu, timegpu, res);
   }
 
-  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
-  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
-  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeChildren, 0, NULL, NULL), "Error releasing OpenGL buffer.");
-  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeParents, 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBs[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBs[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeChildrenGL, 0, NULL, NULL), "Error releasing OpenGL buffer.");
 
   clFinish(CommandQueue);
 }
@@ -1117,7 +1098,7 @@ void CCreateBVH::AdvancePositions(cl_context Context, cl_command_queue CommandQu
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 }
 
-void CCreateBVH::CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs[2], cl_mem positions) {
+void CCreateBVH::CreateLeafAABBs(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs[2], cl_mem positions, cl_uint offset) {
   cl_int clErr;
   // We need as many work items as elements
   size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
@@ -1126,6 +1107,7 @@ void CCreateBVH::CreateLeafAABBs(cl_context Context, cl_command_queue CommandQue
   clErr |= clSetKernelArg(m_CreateLeafAABBsKernel, 1, sizeof(cl_mem), (void*)&aabbs[0]);
   clErr |= clSetKernelArg(m_CreateLeafAABBsKernel, 2, sizeof(cl_mem), (void*)&aabbs[1]);
   clErr |= clSetKernelArg(m_CreateLeafAABBsKernel, 3, sizeof(cl_uint), (void*)&m_nElements);
+  clErr |= clSetKernelArg(m_CreateLeafAABBsKernel, 4, sizeof(cl_uint), (void*)&offset);
   V_RETURN_CL(clErr, "Error setting kernel arguments.");
 
   clErr = clEnqueueNDRangeKernel(CommandQueue, m_CreateLeafAABBsKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
@@ -1155,7 +1137,7 @@ void CCreateBVH::ReduceAABB(cl_context Context, cl_command_queue CommandQueue, c
   }
 }
 void CCreateBVH::MortonCodeAABB(cl_context Context, cl_command_queue CommandQueue, cl_mem mortonaabb, cl_mem aabbs[2], cl_mem positions) {
-  CreateLeafAABBs(Context, CommandQueue, m_clAABBLeaves, positions);
+  CreateLeafAABBs(Context, CommandQueue, aabbs, positions, 0);
   ReduceAABB(Context, CommandQueue, aabbs[0], m_ReduceAABBminKernel);
   ReduceAABB(Context, CommandQueue, aabbs[1], m_ReduceAABBmaxKernel);
 
@@ -1324,7 +1306,7 @@ void CCreateBVH::CreateHierarchy(cl_context Context, cl_command_queue CommandQue
   // We need as many work items as elements
   size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
 
-  clErr = clSetKernelArg( m_NodesHierarchyKernel, 0, sizeof(cl_mem), (void*)&children);
+  clErr = clSetKernelArg(m_NodesHierarchyKernel, 0, sizeof(cl_mem), (void*)&children);
   clErr |= clSetKernelArg(m_NodesHierarchyKernel, 1, sizeof(cl_mem), (void*)&parents);
   clErr |= clSetKernelArg(m_NodesHierarchyKernel, 2, sizeof(cl_mem), (void*)&mortoncodes);
   clErr |= clSetKernelArg(m_NodesHierarchyKernel, 3, sizeof(cl_uint), (void*)&m_nElements);
@@ -1333,71 +1315,71 @@ void CCreateBVH::CreateHierarchy(cl_context Context, cl_command_queue CommandQue
   clErr = clEnqueueNDRangeKernel(CommandQueue, m_NodesHierarchyKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 }
+void CCreateBVH::InnerNodeAABBs(cl_context Context, cl_command_queue CommandQueue, cl_mem aabbs[2], cl_mem children, cl_mem parents, cl_mem flags) {
+  cl_int clErr;
+  // We need as many work items as elements
+  size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
+
+  clErr |= clSetKernelArg(m_clInitAABBFlags, 0, sizeof(cl_mem), (void*)&flags);
+  clErr |= clSetKernelArg(m_clInitAABBFlags, 1, sizeof(cl_uint), (void*)&m_nElements);
+  V_RETURN_CL(clErr, "Error setting kernel arguments.");
+
+  clErr = clEnqueueNDRangeKernel(CommandQueue, m_clInitAABBFlags, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
+  V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+
+  clErr = clSetKernelArg( m_clInnerAABBsKernel, 0, sizeof(cl_mem), (void*)&aabbs[0]);
+  clErr |= clSetKernelArg(m_clInnerAABBsKernel, 1, sizeof(cl_mem), (void*)&aabbs[1]);
+  clErr |= clSetKernelArg(m_clInnerAABBsKernel, 2, sizeof(cl_mem), (void*)&children);
+  clErr |= clSetKernelArg(m_clInnerAABBsKernel, 3, sizeof(cl_mem), (void*)&parents);
+  clErr |= clSetKernelArg(m_clInnerAABBsKernel, 4, sizeof(cl_mem), (void*)&flags);
+  clErr |= clSetKernelArg(m_clInnerAABBsKernel, 5, sizeof(cl_uint), (void*)&m_nElements);
+  V_RETURN_CL(clErr, "Error setting kernel arguments.");
+
+  clErr = clEnqueueNDRangeKernel(CommandQueue, m_clInnerAABBsKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
+  V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+}
+void CCreateBVH::CopyChildnodes(cl_context Context, cl_command_queue CommandQueue, cl_mem childrenGL, cl_mem children) {
+  cl_int clErr;
+  // We need as many work items as elements
+  size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
+
+  clErr = clSetKernelArg(m_CopyChildnodesKernel, 0, sizeof(cl_mem), (void*)&childrenGL);
+  clErr |= clSetKernelArg(m_CopyChildnodesKernel, 1, sizeof(cl_mem), (void*)&children);
+  clErr |= clSetKernelArg(m_CopyChildnodesKernel, 2, sizeof(cl_uint), (void*)&m_nElements);
+  V_RETURN_CL(clErr, "Error setting kernel arguments.");
+
+  clErr = clEnqueueNDRangeKernel(CommandQueue, m_CopyChildnodesKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
+  V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+}
+
 
 void CCreateBVH::Render() {
   glCullFace(GL_BACK);
-
-  // enable depth test & depth write
-  glDisable(GL_BLEND);
   glEnable(GL_DEPTH_TEST);
   glDepthMask(GL_TRUE);
 
   glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  glDisable(GL_CULL_FACE);
-  glPolygonMode(GL_FRONT, GL_FILL);
-  glPolygonMode(GL_BACK, GL_LINE);
-  glUseProgramObjectARB(m_ProgRenderMesh);
-  glColor4f(0, 0.5f, 0.2f, 1.0f);
-  if (m_pMesh) m_pMesh->DrawGL(GL_TRIANGLES);
-
-  glEnable(GL_CULL_FACE);
-  glCullFace(GL_BACK);
-
-  // enable depth test but disable depth write
-  glEnable(GL_DEPTH_TEST);
-  glDepthMask(GL_FALSE);
 
   glUseProgramObjectARB(m_ProgRenderParticles);
 
 
-
-  //
-  // Set up the OpenGL state machine for using point sprites...
-  //
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-
-
-  // This is how will our point sprite's size will be modified by
-  // distance from the viewer
-  float quadratic[] = {1.0f, 0.0f, 0.01f};
-  glPointParameterfvARB(GL_POINT_DISTANCE_ATTENUATION_ARB, quadratic);
-
-  glPointSize(10.0f);
-
-  // The alpha of a point is calculated to allow the fading of points
-  // instead of shrinking them past a defined threshold size. The threshold
-  // is defined by GL_POINT_FADE_THRESHOLD_SIZE_ARB and is not clamped to
-  // the minimum and maximum point sizes.
-
-  // Specify point sprite texture coordinate replacement mode for each
-  // texture unit
-  glTexEnvf(GL_POINT_SPRITE_ARB, GL_COORD_REPLACE_ARB, GL_TRUE);
-
-  //
-  // Render point sprites...
-  //
-
-
   glActiveTexture(GL_TEXTURE0);
-  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[0]);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBsTB[0]);
 
   glActiveTexture(GL_TEXTURE1);
-  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[1]);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBsTB[1]);
 
-  glUniform1i(aabbminmax, 1);
+  glActiveTexture(GL_TEXTURE2);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glNodeChildrenGLTB);
+
+  glUniform1i(displaylevel, dlevel);
+  glUniform1i(hi, 1);
+  glDrawArraysInstanced(GL_LINES, 0, 24, m_nElements);
+
+  glUniform1i(displaylevel, dlevel + 1);
+  glUniform1i(hi, 0);
   glDrawArraysInstanced(GL_LINES, 0, 24, m_nElements);
 
   glBindTexture(GL_TEXTURE_BUFFER, 0);
@@ -1448,6 +1430,22 @@ void CCreateBVH::OnIdle(double, float ElapsedTime) {
   // move camera?
   if (m_KeyboardMask[GLFW_KEY_W]) m_TranslateZ += 10.f * ElapsedTime;
   if (m_KeyboardMask[GLFW_KEY_S]) m_TranslateZ -= 10.f * ElapsedTime;
+
+  static bool pressI = false;
+  if (!pressI && m_KeyboardMask[GLFW_KEY_I]) {
+    pressI = true;
+    dlevel++;
+    cout << dlevel << endl;
+  }
+  if (!m_KeyboardMask[GLFW_KEY_I]) pressI = false;
+
+  static bool pressK = false;
+  if (!pressK && m_KeyboardMask[GLFW_KEY_K]) {
+    pressK = true;
+    dlevel--;
+    cout << dlevel << endl;
+  }
+  if (!m_KeyboardMask[GLFW_KEY_K]) pressK = false;
 
   if (m_TranslateZ > 0) m_TranslateZ = 0;
 
