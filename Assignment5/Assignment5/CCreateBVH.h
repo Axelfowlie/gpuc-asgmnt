@@ -67,6 +67,8 @@ public:
   void RadixSort(cl_context Context, cl_command_queue CommandQueue, cl_mem keys, cl_mem permutation);
   void Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem *from, cl_mem permutation);
 
+  void CreateHierarchy(cl_context Context, cl_command_queue CommandQueue, cl_mem children, cl_mem parents, cl_mem mortoncodes);
+
 
   // Not implemented!
   virtual void ComputeCPU(){};
@@ -111,9 +113,9 @@ protected:
   GLuint m_glAABBNodeTB[2] = { 0, 0 };
 
   // One buffer to index the left and right child for each internal node
-  cl_mem m_clNodeChilds = nullptr;
-  GLuint m_glNodeChildsBuf = 0;
-  GLuint m_glNodeChildsTB = 0;
+  cl_mem m_clNodeChildren = nullptr;
+  GLuint m_glNodeChildrenBuf = 0;
+  GLuint m_glNodeChildrenTB = 0;
   // One buffer to index the parent for each nodes
   cl_mem m_clNodeParents = nullptr;
   GLuint m_glNodeParentsBuf = 0;

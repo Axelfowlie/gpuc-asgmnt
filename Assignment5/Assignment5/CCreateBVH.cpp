@@ -18,6 +18,7 @@ GPU Computing / GPGPU Praktikum source code.
 #include "HLSLEx.h"
 
 #include <set>
+#include <bitset>
 #include <string>
 #include <algorithm>
 #include <string.h>
@@ -79,6 +80,8 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   if (!InitGL()) return false;
 
 
+  srand(time(0));
+
   cl_int clError;
   string programCode;
 
@@ -131,7 +134,7 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
   V_RETURN_FALSE_CL(clError, "Failed to create MortonAABB buffer.");
 
   // Create buffers for internal node's children and parents indices
-  m_clNodeChilds = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glNodeChildsBuf, &clError);
+  m_clNodeChildren = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glNodeChildrenBuf, &clError);
   m_clNodeParents = clCreateFromGLBuffer(Context, CL_MEM_READ_WRITE, m_glNodeParentsBuf, &clError);
   V_RETURN_FALSE_CL(clError, "Failed to create internal nodes buffer.");
 
@@ -165,12 +168,12 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
 
 
   // Kernel for calculating internal nodes
-  //CLUtil::LoadProgramSourceToMemory("BVHNodes.cl", programCode);
-  //m_BVHNodesProgram = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
-  //if (!m_BVHNodesProgram) return false;
+  CLUtil::LoadProgramSourceToMemory("BVHNodes.cl", programCode);
+  m_BVHNodesProgram = CLUtil::BuildCLProgramFromMemory(Device, Context, programCode);
+  if (!m_BVHNodesProgram) return false;
 
-  //m_NodesHierarchyKernel = clCreateKernel(m_BVHNodesProgram, "NodesHierarchy", &clError);
-  //V_RETURN_FALSE_CL(clError, "Failed to create NodesHierarchy kernel.");
+  m_NodesHierarchyKernel = clCreateKernel(m_BVHNodesProgram, "NodesHierarchy", &clError);
+  V_RETURN_FALSE_CL(clError, "Failed to create NodesHierarchy kernel.");
 
   //
   //
@@ -289,15 +292,15 @@ bool CCreateBVH::InitGL() {
 
   // Create buffer for internal node children indices
   // For each internal node (m_nElements - 1) left and right child index
-  glGenBuffers(1, &m_glNodeChildsBuf);
-  glBindBuffer(GL_ARRAY_BUFFER, m_glNodeChildsBuf);
+  glGenBuffers(1, &m_glNodeChildrenBuf);
+  glBindBuffer(GL_ARRAY_BUFFER, m_glNodeChildrenBuf);
   glBufferData(GL_ARRAY_BUFFER, m_nElements * sizeof(cl_uint2), NULL, GL_DYNAMIC_DRAW);
   CHECK_FOR_OGL_ERROR();
 
   // Create texture buffer
-  glGenTextures(1, &m_glNodeChildsTB);
-  glBindTexture(GL_TEXTURE_BUFFER, m_glNodeChildsTB);
-  glTexBuffer(GL_TEXTURE_BUFFER, GL_RG32UI, m_glNodeChildsTB);
+  glGenTextures(1, &m_glNodeChildrenTB);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glNodeChildrenTB);
+  glTexBuffer(GL_TEXTURE_BUFFER, GL_RG32UI, m_glNodeChildrenTB);
   glBindBuffer(GL_TEXTURE_BUFFER, 0);
   glBindTexture(GL_TEXTURE_BUFFER, 0);
   CHECK_FOR_OGL_ERROR();
@@ -413,12 +416,12 @@ void CCreateBVH::ComputeGPU(cl_context Context, cl_command_queue CommandQueue, s
   V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
   V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
 
-  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeChilds, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeChildren, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
   V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeParents, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
 
   // DO THE CL STUFF HERE
 
-  // move the center points 
+  // move the center points
   AdvancePositions(Context, CommandQueue, m_clPositions, m_clVelocities);
 
   // Creates leaf node AABBs, reduces them to morton AABB, calculates Morton Codes from the morton AABB
@@ -437,7 +440,7 @@ void CCreateBVH::ComputeGPU(cl_context Context, cl_command_queue CommandQueue, s
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
 
-  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeChilds, 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeChildren, 0, NULL, NULL), "Error releasing OpenGL buffer.");
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeParents, 0, NULL, NULL), "Error releasing OpenGL buffer.");
 
   clFinish(CommandQueue);
@@ -460,6 +463,55 @@ unsigned int morton3D(float x, float y, float z) {
   unsigned int yy = expandBits((unsigned int)y);
   unsigned int zz = expandBits((unsigned int)z);
   return xx * 4 + yy * 2 + zz;
+}
+
+void nodehierarchy(std::vector<cl_uint2>& children, std::vector<cl_uint>& parents, size_t i, size_t left, size_t right,
+                   const std::vector<cl_uint>& mortoncodes) {
+  cl_uint firstCode = mortoncodes[left];
+  cl_uint lastCode = mortoncodes[right];
+
+  int split = left;
+  // Split range of identical codes in the middle
+  if (firstCode == lastCode)
+    split = (left + right) >> 1;
+  else {
+    // count leading zeros of XOR of the two codes, corresponds to number of leading bits that are not the same
+    int referencePrefix = __builtin_clz(firstCode ^ lastCode);
+
+    // Binary search for the highest code, that has a longer common prefix than the reference prefix
+    // Start with the first element in the range and stride of the whole range
+    int step = right - left;
+
+    do {
+      // decrease step size exponentially, and calculate the potential split position
+      step = (step + 1) >> 1;
+      int newSplit = split + step;
+
+      if (newSplit < right) {
+        cl_uint splitCode = mortoncodes[newSplit];
+        int splitPrefix = __builtin_clz(firstCode ^ splitCode);
+        // A larger prefix than referencePrefix means, that we still haven't advanced far enough towards the right
+        if (splitPrefix > referencePrefix) split = newSplit;
+      }
+    } while (step > 1);
+  }
+
+
+  int leftChild = split;
+  if (leftChild == left) leftChild += mortoncodes.size();
+
+  int rightChild = split + 1;
+  if (rightChild == right) rightChild += mortoncodes.size();
+
+  // Set the child nodes in this internal node
+  children[i].s[0] = leftChild;
+  children[i].s[1] = rightChild;
+  // Set the index of the parent in the two child nodes
+  parents[leftChild] = i;
+  parents[rightChild] = i;
+
+  if (leftChild < mortoncodes.size()) nodehierarchy(children, parents, leftChild, left, leftChild, mortoncodes);
+  if (rightChild < mortoncodes.size()) nodehierarchy(children, parents, rightChild, rightChild, right, mortoncodes);
 }
 
 void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQueue) {
@@ -499,6 +551,8 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   glFinish();
   V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
   V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeChildren, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
+  V_RETURN_CL(clEnqueueAcquireGLObjects(CommandQueue, 1, &m_clNodeParents, 0, NULL, NULL), "Error acquiring OpenGL buffer.");
 
   CTimer timer;
   double timecpu, timegpu;
@@ -526,6 +580,10 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   std::vector<cl_float4> positionssort(m_nElements);
   std::vector<cl_float4> positionssort_cpu(m_nElements);
 
+  std::vector<cl_uint2> childnodes(m_nElements);
+  std::vector<cl_uint2> childnodes_cpu(m_nElements);
+  std::vector<cl_uint> parentnodes(2 * m_nElements);
+  std::vector<cl_uint> parentnodes_cpu(2 * m_nElements);
 
   // #############
   // CREATE LEAF NODE AABBs
@@ -683,7 +741,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     print_info("MORTON CODES", timecpu, timegpu, res);
 
     size_t cnt = 0;
-    for (size_t i=0; i < m_nElements; ++i) {
+    for (size_t i = 0; i < m_nElements; ++i) {
       if (mortoncodes[i] != mortoncodes_cpu[i]) {
         cout << i << "             " << mortoncodes[i] << "    " << mortoncodes_cpu[i] << "   >>>>>>> ERROR" << endl;
         ++cnt;
@@ -728,7 +786,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
                 "Error reading data from device!");
-    
+
     // Time for CPU
     timer.Start();
     for (size_t i = 0; i < m_nElements; ++i) {
@@ -882,8 +940,8 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     Scan(Context, CommandQueue, m_clRadixOneBit);
     timer.Start();
     for (size_t i = 0; i < 100; ++i)
-      ReorderKeys(Context, CommandQueue, m_clRadixKeysPong, m_clRadixPermutationPong, m_clMortonCodes, m_clSortPermutation, m_clRadixZeroBit,
-                  m_clRadixOneBit, 0x0001);
+      ReorderKeys(Context, CommandQueue, m_clRadixKeysPong, m_clRadixPermutationPong, m_clMortonCodes, m_clSortPermutation, m_clRadixZeroBit, m_clRadixOneBit,
+                  0x0001);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
@@ -895,8 +953,8 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     Scan(Context, CommandQueue, m_clRadixZeroBit);
     Scan(Context, CommandQueue, m_clRadixOneBit);
-    ReorderKeys(Context, CommandQueue, m_clRadixKeysPong, m_clRadixPermutationPong, m_clMortonCodes, m_clSortPermutation, m_clRadixZeroBit,
-                m_clRadixOneBit, 0x0001);
+    ReorderKeys(Context, CommandQueue, m_clRadixKeysPong, m_clRadixPermutationPong, m_clMortonCodes, m_clSortPermutation, m_clRadixZeroBit, m_clRadixOneBit,
+                0x0001);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixKeysPong, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodessort.data(), 0, NULL, NULL),
                 "Error reading data from device!");
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixPermutationPong, CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
@@ -997,8 +1055,49 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
   }
 
 
+  // #############
+  // PERMUTE
+  // #############
+  if (res) {
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clMortonCodes, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodes.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
+    timer.Start();
+    nodehierarchy(childnodes_cpu, parentnodes_cpu, 0, 0, m_nElements - 1, mortoncodes);
+    timer.Stop();
+    timecpu = timer.GetElapsedMilliseconds();
+
+    timer.Start();
+    for (size_t i = 0; i < 100; ++i) CreateHierarchy(Context, CommandQueue, m_clNodeChildren, m_clNodeParents, m_clMortonCodes);
+    clFinish(CommandQueue);
+    timer.Stop();
+    timegpu = timer.GetElapsedMilliseconds() / 100.0;
+
+
+    MortonCodes(Context, CommandQueue, m_clMortonCodes, m_clMortonAABB, m_clAABBLeaves, m_clPositions);
+    RadixSort(Context, CommandQueue, m_clMortonCodes, m_clSortPermutation);
+
+    CreateHierarchy(Context, CommandQueue, m_clNodeChildren, m_clNodeParents, m_clMortonCodes);
+
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clNodeChildren, CL_TRUE, 0, m_nElements * sizeof(cl_uint2), childnodes.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+    V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clNodeParents, CL_TRUE, 0, 2 * m_nElements * sizeof(cl_uint), parentnodes.data(), 0, NULL, NULL),
+                "Error reading data from device!");
+
+    // children[m_nElements- 1] and parents[m_nElements - 1] are undefined, because this node does not exist
+    // parents[0] is undefined, because the root has no parent node
+    res = memcmp(childnodes.data(), childnodes_cpu.data(), (childnodes.size() - 1) * sizeof(cl_uint2)) == 0 &&
+          memcmp(&parentnodes[1], &parentnodes_cpu[1], (m_nElements - 2) * sizeof(cl_uint)) == 0 &&
+          memcmp(&parentnodes[m_nElements], &parentnodes_cpu[m_nElements], m_nElements * sizeof(cl_uint)) == 0;
+    print_info("NODE HIERARCHY", timecpu, timegpu, res);
+  }
+
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[0], 0, NULL, NULL), "Error releasing OpenGL buffer.");
   V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clAABBLeaves[1], 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeChildren, 0, NULL, NULL), "Error releasing OpenGL buffer.");
+  V_RETURN_CL(clEnqueueReleaseGLObjects(CommandQueue, 1, &m_clNodeParents, 0, NULL, NULL), "Error releasing OpenGL buffer.");
 
   clFinish(CommandQueue);
 }
@@ -1203,12 +1302,12 @@ void CCreateBVH::RadixSort(cl_context Context, cl_command_queue CommandQueue, cl
                 m_clRadixOneBit, mask);
   }
 }
-void CCreateBVH::Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem *target, cl_mem permutation) {
+void CCreateBVH::Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem* target, cl_mem permutation) {
   cl_int clErr;
   // We need as many work items as elements
   size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
 
-  clErr = clSetKernelArg( m_PermuteKernel, 0, sizeof(cl_mem), (void*)&m_clPermuteTemp);
+  clErr = clSetKernelArg(m_PermuteKernel, 0, sizeof(cl_mem), (void*)&m_clPermuteTemp);
   clErr |= clSetKernelArg(m_PermuteKernel, 1, sizeof(cl_mem), (void*)target);
   clErr |= clSetKernelArg(m_PermuteKernel, 2, sizeof(cl_mem), (void*)&permutation);
   clErr |= clSetKernelArg(m_PermuteKernel, 3, sizeof(cl_uint), (void*)&m_nElements);
@@ -1220,6 +1319,20 @@ void CCreateBVH::Permute(cl_context Context, cl_command_queue CommandQueue, cl_m
   swap(m_clPermuteTemp, *target);
 }
 
+void CCreateBVH::CreateHierarchy(cl_context Context, cl_command_queue CommandQueue, cl_mem children, cl_mem parents, cl_mem mortoncodes) {
+  cl_int clErr;
+  // We need as many work items as elements
+  size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
+
+  clErr = clSetKernelArg( m_NodesHierarchyKernel, 0, sizeof(cl_mem), (void*)&children);
+  clErr |= clSetKernelArg(m_NodesHierarchyKernel, 1, sizeof(cl_mem), (void*)&parents);
+  clErr |= clSetKernelArg(m_NodesHierarchyKernel, 2, sizeof(cl_mem), (void*)&mortoncodes);
+  clErr |= clSetKernelArg(m_NodesHierarchyKernel, 3, sizeof(cl_uint), (void*)&m_nElements);
+  V_RETURN_CL(clErr, "Error setting kernel arguments.");
+
+  clErr = clEnqueueNDRangeKernel(CommandQueue, m_NodesHierarchyKernel, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
+  V_RETURN_CL(clErr, "Error when enqueuing kernel.");
+}
 
 void CCreateBVH::Render() {
   glCullFace(GL_BACK);
@@ -1278,11 +1391,11 @@ void CCreateBVH::Render() {
   //
 
 
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[0]);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[0]);
 
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[1]);
+  glActiveTexture(GL_TEXTURE1);
+  glBindTexture(GL_TEXTURE_BUFFER, m_glAABBLeafTB[1]);
 
   glUniform1i(aabbminmax, 1);
   glDrawArraysInstanced(GL_LINES, 0, 24, m_nElements);
