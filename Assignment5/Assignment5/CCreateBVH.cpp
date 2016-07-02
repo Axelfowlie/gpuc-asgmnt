@@ -331,7 +331,7 @@ bool CCreateBVH::InitGL() {
   glUniform1i(n, m_nElements);
 
   displaylevel = glGetUniformLocationARB(m_ProgRenderParticles, "level");
-  hi = glGetUniformLocationARB(m_ProgRenderParticles, "hi");
+  travnode = glGetUniformLocationARB(m_ProgRenderParticles, "travnode");
   CHECK_FOR_OGL_ERROR();
 
 
@@ -1238,8 +1238,15 @@ void CCreateBVH::Scan(cl_context Context, cl_command_queue CommandQueue, cl_mem 
   // Results are in the input buffer again, clean up so that no weird thing happen...
   m_clScanLevels[0].first = nullptr;
 }
-void CCreateBVH::ReorderKeys(cl_context Context, cl_command_queue CommandQueue, cl_mem keysout, cl_mem permutationout, cl_mem keysin, cl_mem permutationin,
-                             cl_mem indexzerobits, cl_mem indexonebits, cl_uint mask) {
+void CCreateBVH::ReorderKeys(cl_context Context,
+                             cl_command_queue CommandQueue,
+                             cl_mem keysout,
+                             cl_mem permutationout,
+                             cl_mem keysin,
+                             cl_mem permutationin,
+                             cl_mem indexzerobits,
+                             cl_mem indexonebits,
+                             cl_uint mask) {
   cl_int clErr;
   // We need as many work items as elements
   size_t globalWorkSize = CLUtil::GetGlobalWorkSize(m_nElements, m_ScanLocalWorkSize[0]);
@@ -1280,8 +1287,15 @@ void CCreateBVH::RadixSort(cl_context Context, cl_command_queue CommandQueue, cl
     Scan(Context, CommandQueue, m_clRadixZeroBit);
     Scan(Context, CommandQueue, m_clRadixOneBit);
     // Reorder
-    ReorderKeys(Context, CommandQueue, keyspingpong[dst], permutationpingpong[dst], keyspingpong[src], permutationpingpong[src], m_clRadixZeroBit,
-                m_clRadixOneBit, mask);
+    ReorderKeys(Context,
+                CommandQueue,
+                keyspingpong[dst],
+                permutationpingpong[dst],
+                keyspingpong[src],
+                permutationpingpong[src],
+                m_clRadixZeroBit,
+                m_clRadixOneBit,
+                mask);
   }
 }
 void CCreateBVH::Permute(cl_context Context, cl_command_queue CommandQueue, cl_mem* target, cl_mem permutation) {
@@ -1327,7 +1341,7 @@ void CCreateBVH::InnerNodeAABBs(cl_context Context, cl_command_queue CommandQueu
   clErr = clEnqueueNDRangeKernel(CommandQueue, m_clInitAABBFlags, 1, NULL, &globalWorkSize, m_ScanLocalWorkSize, 0, NULL, NULL);
   V_RETURN_CL(clErr, "Error when enqueuing kernel.");
 
-  clErr = clSetKernelArg( m_clInnerAABBsKernel, 0, sizeof(cl_mem), (void*)&aabbs[0]);
+  clErr = clSetKernelArg(m_clInnerAABBsKernel, 0, sizeof(cl_mem), (void*)&aabbs[0]);
   clErr |= clSetKernelArg(m_clInnerAABBsKernel, 1, sizeof(cl_mem), (void*)&aabbs[1]);
   clErr |= clSetKernelArg(m_clInnerAABBsKernel, 2, sizeof(cl_mem), (void*)&children);
   clErr |= clSetKernelArg(m_clInnerAABBsKernel, 3, sizeof(cl_mem), (void*)&parents);
@@ -1376,16 +1390,18 @@ void CCreateBVH::Render() {
 
   glDisable(GL_DEPTH_TEST);
 
-  if (showleaves) {
-    glLineWidth(1);
-    glUniform1i(hi, 0);
+  // display all leaf nodes glLineWidth(1);
+  glUniform1i(displaylevel, -1);
+  glUniform1i(travnode, travnode_val);
+  glDrawArraysInstanced(GL_LINES, 0, 24, m_nElements);
+
+  // display all AABBs in same level
+  if (travnode_val < 0) {
+    glLineWidth(2);
+    glUniform1i(displaylevel, displaylevel_val);
+    glUniform1i(travnode, -2);
     glDrawArraysInstanced(GL_LINES, 0, 24, m_nElements);
   }
-
-  glLineWidth(2);
-  glUniform1i(displaylevel, dlevel);
-  glUniform1i(hi, 1);
-  glDrawArraysInstanced(GL_LINES, 0, 24, m_nElements);
 
 
   glBindTexture(GL_TEXTURE_BUFFER, 0);
@@ -1440,23 +1456,32 @@ void CCreateBVH::OnIdle(double, float ElapsedTime) {
   static bool pressI = false;
   if (!pressI && m_KeyboardMask[GLFW_KEY_I]) {
     pressI = true;
-    dlevel++;
-    cout << dlevel << endl;
+    displaylevel_val++;
+    cout << "Showinglevel : " << displaylevel_val << endl;
   }
   if (!m_KeyboardMask[GLFW_KEY_I]) pressI = false;
 
   static bool pressK = false;
   if (!pressK && m_KeyboardMask[GLFW_KEY_K]) {
     pressK = true;
-    dlevel--;
-    cout << dlevel << endl;
+    displaylevel_val--;
+    cout << "Showinglevel : " << displaylevel_val << endl;
   }
   if (!m_KeyboardMask[GLFW_KEY_K]) pressK = false;
+
+  static bool pressJ = false;
+  if (!pressJ && m_KeyboardMask[GLFW_KEY_J]) {
+    pressJ = true;
+    travnode_val--;
+    cout << "Traversing node:  " << travnode_val << endl;
+  }
+  if (!m_KeyboardMask[GLFW_KEY_J]) pressJ = false;
 
   static bool pressL = false;
   if (!pressL && m_KeyboardMask[GLFW_KEY_L]) {
     pressL = true;
-    showleaves = !showleaves;
+    travnode_val++;
+    cout << "Traversing node:  " << travnode_val << endl;
   }
   if (!m_KeyboardMask[GLFW_KEY_L]) pressL = false;
 

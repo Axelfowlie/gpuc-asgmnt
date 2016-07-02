@@ -178,9 +178,9 @@ protected:
   //
 
   GLint displaylevel;
-  GLint hi;
-  GLint dlevel = 0;
-  bool showleaves = false;
+  GLint travnode;
+  GLint displaylevel_val = 0;
+  GLint travnode_val = -1;
 
   std::string m_CollisionMeshPath;
 
