@@ -187,14 +187,9 @@ protected:
   CTriMesh* m_pMesh = nullptr;
 
 
-  GLhandleARB m_VSParticles = 0;
-  GLhandleARB m_GSParticles = 0;
-  GLhandleARB m_PSParticles = 0;
-  GLhandleARB m_ProgRenderParticles = 0;
-
-  GLhandleARB m_VSMesh = 0;
-  GLhandleARB m_PSMesh = 0;
-  GLhandleARB m_ProgRenderMesh = 0;
+  GLhandleARB m_VSRenderAABBs = 0;
+  GLhandleARB m_PSRenderAABBs = 0;
+  GLhandleARB m_ProgRenderAABBs = 0;
 
 
   bool m_KeyboardMask[255] /*= { false }*/;

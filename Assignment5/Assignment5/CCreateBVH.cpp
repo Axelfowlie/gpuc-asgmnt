@@ -240,23 +240,6 @@ bool CCreateBVH::InitResources(cl_device_id Device, cl_context Context, cl_comma
 }
 
 bool CCreateBVH::InitGL() {
-  // Load mesh
-  float4x4 M = float4x4(1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.5f, 0.f, 0.5f, 0.f);
-
-  m_pMesh = CTriMesh::LoadFromObj(m_CollisionMeshPath, M);
-
-  m_pMesh->GetVertexBuffer();
-  if (!m_pMesh) {
-    cout << "Failed to load mesh." << endl;
-    return false;
-  }
-  if (!m_pMesh->CreateGLResources()) {
-    cout << "Failed to create mesh OpenGL resources" << endl;
-    return false;
-  }
-
-
-
   // Create buffers for leaf node AABBs
   glGenBuffers(2, m_glAABBsBuf);
   glBindBuffer(GL_TEXTURE_BUFFER, m_glAABBsBuf[0]);
@@ -294,46 +277,33 @@ bool CCreateBVH::InitGL() {
 
 
   // shader programs
-  m_VSMesh = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
-  m_PSMesh = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
+  m_VSRenderAABBs = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
+  m_PSRenderAABBs = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
 
-  if (!CreateShaderFromFile("mesh.vert", m_VSMesh)) return false;
+  if (!CreateShaderFromFile("renderaabbs.vert", m_VSRenderAABBs)) return false;
+  if (!CreateShaderFromFile("renderaabbs.frag", m_PSRenderAABBs)) return false;
 
-  if (!CreateShaderFromFile("mesh.frag", m_PSMesh)) return false;
+  m_ProgRenderAABBs = glCreateProgramObjectARB();
+  glAttachObjectARB(m_ProgRenderAABBs, m_VSRenderAABBs);
+  glAttachObjectARB(m_ProgRenderAABBs, m_PSRenderAABBs);
+  if (!LinkGLSLProgram(m_ProgRenderAABBs)) return false;
 
-  m_ProgRenderMesh = glCreateProgramObjectARB();
-  glAttachObjectARB(m_ProgRenderMesh, m_VSMesh);
-  glAttachObjectARB(m_ProgRenderMesh, m_PSMesh);
-  if (!LinkGLSLProgram(m_ProgRenderMesh)) return false;
-
-  m_VSParticles = glCreateShaderObjectARB(GL_VERTEX_SHADER_ARB);
-  m_PSParticles = glCreateShaderObjectARB(GL_FRAGMENT_SHADER_ARB);
-
-  if (!CreateShaderFromFile("particles.vert", m_VSParticles)) return false;
-  if (!CreateShaderFromFile("particles.frag", m_PSParticles)) return false;
-
-  m_ProgRenderParticles = glCreateProgramObjectARB();
-  glAttachObjectARB(m_ProgRenderParticles, m_VSParticles);
-  glAttachObjectARB(m_ProgRenderParticles, m_PSParticles);
-  if (!LinkGLSLProgram(m_ProgRenderParticles)) return false;
-
-  GLint tboSampler = glGetUniformLocationARB(m_ProgRenderParticles, "AABBmin");
-  glUseProgramObjectARB(m_ProgRenderParticles);
+  GLint tboSampler = glGetUniformLocationARB(m_ProgRenderAABBs, "AABBmin");
+  glUseProgramObjectARB(m_ProgRenderAABBs);
   glUniform1i(tboSampler, 0);
-  tboSampler = glGetUniformLocationARB(m_ProgRenderParticles, "AABBmax");
-  glUseProgramObjectARB(m_ProgRenderParticles);
+  tboSampler = glGetUniformLocationARB(m_ProgRenderAABBs, "AABBmax");
+  glUseProgramObjectARB(m_ProgRenderAABBs);
   glUniform1i(tboSampler, 1);
-  tboSampler = glGetUniformLocationARB(m_ProgRenderParticles, "Children");
-  glUseProgramObjectARB(m_ProgRenderParticles);
+  tboSampler = glGetUniformLocationARB(m_ProgRenderAABBs, "Children");
+  glUseProgramObjectARB(m_ProgRenderAABBs);
   glUniform1i(tboSampler, 2);
 
-  GLint n = glGetUniformLocationARB(m_ProgRenderParticles, "N");
+  GLint n = glGetUniformLocationARB(m_ProgRenderAABBs, "N");
   glUniform1i(n, m_nElements);
 
-  displaylevel = glGetUniformLocationARB(m_ProgRenderParticles, "level");
-  travnode = glGetUniformLocationARB(m_ProgRenderParticles, "travnode");
+  displaylevel = glGetUniformLocationARB(m_ProgRenderAABBs, "level");
+  travnode = glGetUniformLocationARB(m_ProgRenderAABBs, "travnode");
   CHECK_FOR_OGL_ERROR();
-
 
 
 
@@ -349,42 +319,68 @@ bool CCreateBVH::InitGL() {
 }
 
 void CCreateBVH::ReleaseResources() {
-  if (m_pMesh) {
-    m_pMesh->ReleaseGLResources();
-    delete m_pMesh;
-    m_pMesh = NULL;
-  }
+  SAFE_RELEASE_MEMOBJECT(m_clPositions);
+  SAFE_RELEASE_MEMOBJECT(m_clVelocities);
+  SAFE_RELEASE_MEMOBJECT(m_clAABBs[0]);
+  SAFE_RELEASE_MEMOBJECT(m_clAABBs[1]);
+  SAFE_RELEASE_MEMOBJECT(m_clMortonAABB);
 
-  // Device resources
+  SAFE_RELEASE_GL_BUFFER(m_glAABBsBuf[0]);
+  SAFE_RELEASE_GL_BUFFER(m_glAABBsBuf[1]);
+  glDeleteTextures(2, m_glAABBsTB);
 
-  for (auto& level : m_clScanLevels) SAFE_RELEASE_MEMOBJECT(level.first);
+  SAFE_RELEASE_MEMOBJECT(m_clNodeChildren);
+  SAFE_RELEASE_MEMOBJECT(m_clNodeChildrenGL);
+  SAFE_RELEASE_GL_BUFFER(m_glNodeChildrenGLBuf);
+  glDeleteTextures(1, &m_glNodeChildrenGLTB);
 
-  SAFE_RELEASE_PROGRAM(m_MortonCodesProgram);
-  SAFE_RELEASE_KERNEL(m_ReduceAABBminKernel);
-  SAFE_RELEASE_KERNEL(m_ReduceAABBmaxKernel);
+  SAFE_RELEASE_MEMOBJECT(m_clNodeParents);
+  SAFE_RELEASE_MEMOBJECT(m_clInnerAABBFlags);
+
 
   SAFE_RELEASE_PROGRAM(m_PrepAABBsProgram);
   SAFE_RELEASE_KERNEL(m_AdvancePositionsKernel);
   SAFE_RELEASE_KERNEL(m_CreateLeafAABBsKernel);
 
+  SAFE_RELEASE_PROGRAM(m_MortonCodesProgram);
+  SAFE_RELEASE_KERNEL(m_ReduceAABBminKernel);
+  SAFE_RELEASE_KERNEL(m_ReduceAABBmaxKernel);
+  SAFE_RELEASE_KERNEL(m_MortonCodeAABBKernel);
+  SAFE_RELEASE_KERNEL(m_MortonCodesKernel);
+
+  SAFE_RELEASE_PROGRAM(m_BVHNodesProgram);
+  SAFE_RELEASE_KERNEL(m_NodesHierarchyKernel);
+  SAFE_RELEASE_KERNEL(m_clInitAABBFlags);
+  SAFE_RELEASE_KERNEL(m_clInnerAABBsKernel);
+  SAFE_RELEASE_KERNEL(m_CopyChildnodesKernel);
+
+
+  SAFE_RELEASE_MEMOBJECT(m_clMortonCodes);
+  SAFE_RELEASE_MEMOBJECT(m_clSortPermutation);
+  SAFE_RELEASE_MEMOBJECT(m_clRadixKeysPong);
+  SAFE_RELEASE_MEMOBJECT(m_clRadixPermutationPong);
+  SAFE_RELEASE_MEMOBJECT(m_clRadixZeroBit);
+  SAFE_RELEASE_MEMOBJECT(m_clRadixOneBit);
+  SAFE_RELEASE_MEMOBJECT(m_clPermuteTemp);
+
+
+
+  SAFE_RELEASE_PROGRAM(m_RadixSortProgram);
   SAFE_RELEASE_KERNEL(m_SelectBitflagKernel);
   SAFE_RELEASE_KERNEL(m_ReorderKeysKernel);
   SAFE_RELEASE_KERNEL(m_PermutationIdentityKernel);
   SAFE_RELEASE_KERNEL(m_PermuteKernel);
-  SAFE_RELEASE_PROGRAM(m_RadixSortProgram);
+
+  for (auto& level : m_clScanLevels) SAFE_RELEASE_MEMOBJECT(level.first);
 
   SAFE_RELEASE_KERNEL(m_ScanKernel);
   SAFE_RELEASE_KERNEL(m_ScanAddKernel);
   SAFE_RELEASE_PROGRAM(m_ScanProgram);
 
 
-  SAFE_RELEASE_GL_SHADER(m_PSParticles);
-  SAFE_RELEASE_GL_SHADER(m_VSParticles);
-  SAFE_RELEASE_GL_SHADER(m_VSMesh);
-  SAFE_RELEASE_GL_SHADER(m_PSMesh);
-
-  SAFE_RELEASE_GL_PROGRAM(m_ProgRenderParticles);
-  SAFE_RELEASE_GL_PROGRAM(m_ProgRenderMesh);
+  SAFE_RELEASE_GL_SHADER(m_PSRenderAABBs);
+  SAFE_RELEASE_GL_SHADER(m_VSRenderAABBs);
+  SAFE_RELEASE_GL_PROGRAM(m_ProgRenderAABBs);
 }
 
 void CCreateBVH::ComputeGPU(cl_context Context, cl_command_queue CommandQueue, size_t LocalWorkSize[3]) {
@@ -448,8 +444,8 @@ unsigned int morton3D(float x, float y, float z) {
   return xx * 4 + yy * 2 + zz;
 }
 
-void nodehierarchy(std::vector<cl_uint2>& children, std::vector<cl_uint>& parents, size_t i, size_t left, size_t right,
-                   const std::vector<cl_uint>& mortoncodes) {
+void nodehierarchy(
+    std::vector<cl_uint2>& children, std::vector<cl_uint>& parents, size_t i, size_t left, size_t right, const std::vector<cl_uint>& mortoncodes) {
   cl_uint firstCode = mortoncodes[left];
   cl_uint lastCode = mortoncodes[right];
 
@@ -922,8 +918,8 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     Scan(Context, CommandQueue, m_clRadixOneBit);
     timer.Start();
     for (size_t i = 0; i < 100; ++i)
-      ReorderKeys(Context, CommandQueue, m_clRadixKeysPong, m_clRadixPermutationPong, m_clMortonCodes, m_clSortPermutation, m_clRadixZeroBit, m_clRadixOneBit,
-                  0x0001);
+      ReorderKeys(
+          Context, CommandQueue, m_clRadixKeysPong, m_clRadixPermutationPong, m_clMortonCodes, m_clSortPermutation, m_clRadixZeroBit, m_clRadixOneBit, 0x0001);
     clFinish(CommandQueue);
     timer.Stop();
     timegpu = timer.GetElapsedMilliseconds() / 100.0;
@@ -935,8 +931,8 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     SelectBitflag(Context, CommandQueue, m_clRadixZeroBit, m_clRadixOneBit, m_clMortonCodes, 0x0001);
     Scan(Context, CommandQueue, m_clRadixZeroBit);
     Scan(Context, CommandQueue, m_clRadixOneBit);
-    ReorderKeys(Context, CommandQueue, m_clRadixKeysPong, m_clRadixPermutationPong, m_clMortonCodes, m_clSortPermutation, m_clRadixZeroBit, m_clRadixOneBit,
-                0x0001);
+    ReorderKeys(
+        Context, CommandQueue, m_clRadixKeysPong, m_clRadixPermutationPong, m_clMortonCodes, m_clSortPermutation, m_clRadixZeroBit, m_clRadixOneBit, 0x0001);
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixKeysPong, CL_TRUE, 0, m_nElements * sizeof(cl_uint), mortoncodessort.data(), 0, NULL, NULL),
                 "Error reading data from device!");
     V_RETURN_CL(clEnqueueReadBuffer(CommandQueue, m_clRadixPermutationPong, CL_TRUE, 0, m_nElements * sizeof(cl_uint), permutation.data(), 0, NULL, NULL),
@@ -1376,7 +1372,7 @@ void CCreateBVH::Render() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-  glUseProgramObjectARB(m_ProgRenderParticles);
+  glUseProgramObjectARB(m_ProgRenderAABBs);
 
 
   glActiveTexture(GL_TEXTURE0);
