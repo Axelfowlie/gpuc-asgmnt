@@ -721,7 +721,7 @@ void CCreateBVH::TestPerformance(cl_context Context, cl_command_queue CommandQue
     size_t cnt = 0;
     for (size_t i = 0; i < m_nElements; ++i) {
       if (mortoncodes[i] != mortoncodes_cpu[i]) {
-        cout << i << "             " << mortoncodes[i] << "    " << mortoncodes_cpu[i] << "   >>>>>>> ERROR" << endl;
+        cout << i << "             " << std::hex << mortoncodes[i] << "    " << mortoncodes_cpu[i] << "   >>>>>>> ERROR" << std::dec << endl;
         ++cnt;
       }
     }
